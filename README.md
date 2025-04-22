@@ -132,7 +132,7 @@ $$Z_{\text{fc}} \in \mathbb{R}^{10}$$
 
 Finally, the output $Z_{\text{fc}}$ is passed through a softmax activation function to obtain the class probabilities. The softmax function for the $i$-th class is defined as:
 
-$$\hat{y}_i = \frac{e^{Z_{\text{fc},i}}}{\sum_{j=1}^{10} e^{Z_{\text{fc},j}}}$$
+$$\hat{y}_ i = \frac{e^{Z_{\text{fc},i}}}{\sum_{j=1}^{10} e^{Z_{\text{fc},j}}}$$
 
 where $\hat{y}_i$ is the predicted probability for class $i$, and the denominator ensures that the sum of all predicted probabilities equals 1.
 
@@ -142,7 +142,7 @@ where $\hat{y}_i$ is the predicted probability for class $i$, and the denominato
 
 The transformation from the input image $X$ to the predicted class probabilities $\hat{y}$ is expressed as:
 
-$$\hat{y}_i = \frac{e^{Z_{\text{fc},i}}}{\sum_{j=1}^{10} e^{Z_{\text{fc},j}}}$$
+$$\hat{y}_ i = \frac{e^{Z_{\text{fc},i}}}{\sum_{j=1}^{10} e^{Z_{\text{fc},j}}}$$
 
 Where:
 
