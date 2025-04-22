@@ -1,0 +1,26 @@
+# Ignore compiled binaries
+*.o
+*.out
+*.elf
+*.a
+*.so
+*.bin
+
+# Ignore RISC-V-specific files
+*.riscv
+*.img
+
+# Ignore build directories
+/build/
+*/build/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Ignore Python-related files
+*.pyc
+__pycache__/
+
