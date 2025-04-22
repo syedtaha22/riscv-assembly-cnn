@@ -25,6 +25,3 @@
 __pycache__/
 
 *.exe
-
-# Ignore cpp folder
-cpp/
