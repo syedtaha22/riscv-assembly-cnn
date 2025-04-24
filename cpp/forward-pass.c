@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <time.h> // For clock_t and clock()
+
 
 // Conv2d parameters
 int cl_in_dim = 28;
@@ -264,37 +266,52 @@ float* forward(float*** input) {
 
 
 int main() {
-    // Example MNIST-like input: 28x28 grayscale image
-    float*** input = (float***)malloc(28 * sizeof(float**));
-    for (int i = 0; i < 28; ++i) {
-        input[i] = (float**)malloc(28 * sizeof(float*));
-        for (int j = 0; j < 28; ++j) input[i][j] = (float*)malloc(1 * sizeof(float));
+    // Start the clock
+    clock_t start = clock();
+    int total_runs = 100000;
+
+
+    for (int i = 0; i < total_runs; i++) {
+        // Example MNIST-like input: 28x28 grayscale image
+        float*** input = (float***)malloc(28 * sizeof(float**));
+        for (int i = 0; i < 28; ++i) {
+            input[i] = (float**)malloc(28 * sizeof(float*));
+            for (int j = 0; j < 28; ++j) input[i][j] = (float*)malloc(1 * sizeof(float));
+        }
+
+        // Initialize input with some values (e.g., all pixels set to 0.5)
+        for (int i = 0; i < 28; ++i) {
+            for (int j = 0; j < 28; ++j) input[i][j][0] = 0.5f; // Example pixel value
+        }
+
+        float* output = forward(input);
+        
+        
+        // Print the output
+        // printf("Softmax output:\n");
+        // for (int i = 0; i < 10; ++i) printf("%f\n", output[i]);
+
+        // Clean up
+        free(output);
+        clean_conv_filters();
+        clean_conv_biases();
+        clean_dense_weights();
+        clean_dense_biases();
+
+        for (int i = 0; i < 28; ++i) {
+            for (int j = 0; j < 28; ++j) free(input[i][j]);
+            free(input[i]);
+        }
+        free(input);
     }
 
-    // Initialize input with some values (e.g., all pixels set to 0.5)
-    for (int i = 0; i < 28; ++i) {
-        for (int j = 0; j < 28; ++j) input[i][j][0] = 0.5f; // Example pixel value
-    }
+    // Stop the clock
+    clock_t end = clock();
 
-    float* output = forward(input);
-    printf("Softmax output:\n");
-
-
-    // Print the output
-    for (int i = 0; i < 10; ++i) printf("%f\n", output[i]);
-
-    // Clean up
-    free(output);
-    clean_conv_filters();
-    clean_conv_biases();
-    clean_dense_weights();
-    clean_dense_biases();
-
-    for (int i = 0; i < 28; ++i) {
-        for (int j = 0; j < 28; ++j) free(input[i][j]);
-        free(input[i]);
-    }
-    free(input);
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time taken for %d runs: %f seconds\n", total_runs, time_spent);
+    time_spent /= total_runs;
+    printf("Time taken per run: %f seconds\n", time_spent);
 
     return 0;
 }
