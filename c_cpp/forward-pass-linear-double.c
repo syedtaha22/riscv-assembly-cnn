@@ -1,17 +1,13 @@
 /*************************************************************
  * forward-pass-linear.c but uses double instead of float
- *************************************************************/
+**************************************************************/
 
-
-
-
- // include for printf
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h> // for int32_t
-#include <time.h> // For clock_t and clock()
-#include <string.h> // For strstr
-#include <stdbool.h> // For bool type
+#include <stdint.h>     // for int32_t
+#include <time.h>       // For clock_t and clock()
+#include <string.h>     // For strstr
+#include <stdbool.h>    // For bool type
 
 // Conv2d parameters
 const uint32_t cl_in_dim = 28;
