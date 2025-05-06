@@ -1,5 +1,5 @@
 /*************************************************************
- * forward-pass-linear.c but uses double instead of float
+ * forward-pass-linear.c but uses float instead of float
 **************************************************************/
 
 #include <stdio.h>
@@ -39,14 +39,14 @@
 #define EULER_NUMBER     2.718281828459045
 
 /* Model parameters */
-double* conv_filters;   // 4D array for filters
-double* conv_biases;    // 1D array for biases
-double* dense_weights;  // 2D array for weights
-double* dense_biases;   // 1D array for biases
+float* conv_filters;   // 4D array for filters
+float* conv_biases;    // 1D array for biases
+float* dense_weights;  // 2D array for weights
+float* dense_biases;   // 1D array for biases
 
 // Function to print a vector (for debugging purposes)
 // Takes in 1d array and it's Dimensions, then prints D, WxH grids
-void print_output_vector(double* vec, uint32_t width, uint32_t height, uint32_t depth) {
+void print_output_vector(float* vec, uint32_t width, uint32_t height, uint32_t depth) {
     // upto 2 decimal points
     for (uint32_t c = 0; c < depth; ++c) {
         printf("Channel %d:\n", c);
@@ -62,22 +62,22 @@ void print_output_vector(double* vec, uint32_t width, uint32_t height, uint32_t 
 }
 
 
-void print_vector(double* vec, uint32_t size) {
+void print_vector(float* vec, uint32_t size) {
     for (uint32_t i = 0; i < size; ++i) printf("%.3lf ", vec[i]);
     printf("\n");
 }
 
-double* get_max_in_range(double* start, double* end) {
-    double* maxPtr = start;
-    for (double* ptr = start; ptr < end; ++ptr) if (*ptr > *maxPtr) maxPtr = ptr;
+float* get_max_in_range(float* start, float* end) {
+    float* maxPtr = start;
+    for (float* ptr = start; ptr < end; ++ptr) if (*ptr > *maxPtr) maxPtr = ptr;
     return maxPtr;
 }
 
-double get_max(double a, double b) { return a > b ? a : b; }
+float get_max(float a, float b) { return a > b ? a : b; }
 
 // Function to calculate e^x for any integer or negative x
-double exp_x(int x) {
-    double result = 1.0;
+float exp_x(int x) {
+    float result = 1.0;
     int abs_x = x;
     if (x < 0) abs_x = -x;
     for (int i = 0; i < abs_x; ++i) result *= EULER_NUMBER;
@@ -96,11 +96,11 @@ uint32_t idx_kcfhfw(uint32_t k, uint32_t c, uint32_t fh, uint32_t fw, uint32_t C
 }
 
 
-double relu(double x) { return x > 0 ? x : 0; }
+float relu(float x) { return x > 0 ? x : 0; }
 
-void softmax(double* input, uint32_t size) {
-    double maxVal = *get_max_in_range(input, input + size);
-    double sum = 0.0f;
+void softmax(float* input, uint32_t size) {
+    float maxVal = *get_max_in_range(input, input + size);
+    float sum = 0.0f;
     for (uint32_t i = 0; i < size; ++i) {
         input[i] = exp_x(input[i] - maxVal);
         sum += input[i];
@@ -108,16 +108,16 @@ void softmax(double* input, uint32_t size) {
     for (uint32_t i = 0; i < size; ++i) input[i] /= sum;
 }
 
-double* conv2d(double* input, double* filters, double* biases) {
+float* conv2d(float* input, float* filters, float* biases) {
     // Allocate output array
-    double* output = (double*)malloc(CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS * sizeof(double));
-    double local_output[24 * 24 * 8] = { 0 };
+    float* output = (float*)malloc(CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS * sizeof(float));
+    float local_output[24 * 24 * 8] = { 0 };
 
     // Perform convolution
     for (uint32_t k = 0; k < CL_NUM_FILTERS; ++k) {
         for (uint32_t i = 0; i < CL_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < CL_OUT_DIM; ++j) {
-                double sum = 0.0f;
+                float sum = 0.0f;
                 for (uint32_t fi = 0; fi < CL_FILTER_DIM; ++fi) {
                     for (uint32_t fj = 0; fj < CL_FILTER_DIM; ++fj) {
                         for (uint32_t c = 0; c < CL_IN_CHANNELS; ++c) {
@@ -141,22 +141,22 @@ double* conv2d(double* input, double* filters, double* biases) {
 
 
 
-double* ReLU(double* input, uint32_t size) {
+float* ReLU(float* input, uint32_t size) {
     for (uint32_t i = 0; i < size; ++i) {
         input[i] = relu(input[i]);
     }
     return input;
 }
 
-double* maxPool(double* input) {
+float* maxPool(float* input) {
     // Allocate output array
-    double* output = (double*)malloc(MP_OUT_DIM * MP_OUT_DIM * MP_OUT_CHANNELS * sizeof(double));
+    float* output = (float*)malloc(MP_OUT_DIM * MP_OUT_DIM * MP_OUT_CHANNELS * sizeof(float));
 
     // Perform max pooling
     for (uint32_t c = 0; c < MP_OUT_CHANNELS; ++c) {
         for (uint32_t i = 0; i < MP_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < MP_OUT_DIM; ++j) {
-                double maxVal = -1e9;
+                float maxVal = -1e9;
                 for (uint32_t di = 0; di < MP_KERNEL_DIM; ++di) {
                     for (uint32_t dj = 0; dj < MP_KERNEL_DIM; ++dj) {
 
@@ -176,9 +176,9 @@ double* maxPool(double* input) {
     return output;
 }
 
-double* flatten(double* input) {
+float* flatten(float* input) {
     // Allocate output array
-    double* output = (double*)malloc(FL_OUT_DIM * sizeof(double));
+    float* output = (float*)malloc(FL_OUT_DIM * sizeof(float));
     uint32_t index = 0;
     for (uint32_t i = 0; i < FL_IN_DIM; ++i) {
         for (uint32_t j = 0; j < FL_IN_DIM; ++j) {
@@ -192,11 +192,11 @@ double* flatten(double* input) {
     return output;
 }
 
-double* dense(double* input, double* weights, double* biases) {
+float* dense(float* input, float* weights, float* biases) {
     // Allocate output array
-    double* output = (double*)malloc(D_OUT_DIM * sizeof(double));
+    float* output = (float*)malloc(D_OUT_DIM * sizeof(float));
     for (uint32_t i = 0; i < D_OUT_DIM; ++i) {
-        double sum = biases[i];
+        float sum = biases[i];
         for (uint32_t j = 0; j < D_IN_DIM; ++j) {
             uint32_t index = j * D_OUT_DIM + i; // 1D index for weights
             sum += input[j] * weights[index];
@@ -220,10 +220,10 @@ void load_model_params() {
     }
 
     // Allocate memory if not already allocated
-    conv_filters = (double*)malloc(CL_NUM_FILTERS * CL_FILTER_DIM * CL_FILTER_DIM * CL_IN_CHANNELS * sizeof(double));
-    conv_biases = (double*)malloc(CL_NUM_FILTERS * sizeof(double));
-    dense_weights = (double*)malloc(D_OUT_DIM * D_IN_DIM * sizeof(double));
-    dense_biases = (double*)malloc(D_OUT_DIM * sizeof(double));
+    conv_filters = (float*)malloc(CL_NUM_FILTERS * CL_FILTER_DIM * CL_FILTER_DIM * CL_IN_CHANNELS * sizeof(float));
+    conv_biases = (float*)malloc(CL_NUM_FILTERS * sizeof(float));
+    dense_weights = (float*)malloc(D_OUT_DIM * D_IN_DIM * sizeof(float));
+    dense_biases = (float*)malloc(D_OUT_DIM * sizeof(float));
 
     if (!conv_filters || !conv_biases || !dense_weights || !dense_biases) {
         perror("malloc failed");
@@ -240,14 +240,14 @@ void load_model_params() {
 
     uint32_t total_conv_filters = CL_NUM_FILTERS * CL_FILTER_DIM * CL_FILTER_DIM * CL_IN_CHANNELS;
     idx = 0;
-    while (idx < total_conv_filters && fscanf(fp, "%lf,", &conv_filters[idx]) == 1) idx++;
+    while (idx < total_conv_filters && fscanf(fp, "%f,", &conv_filters[idx]) == 1) idx++;
     if (idx < total_conv_filters) printf("Warning: Only loaded %u/%u conv filter values\n", idx, total_conv_filters);
 
     // ===== Load conv_biases =====
     while (fgets(line, sizeof(line), fp)) if (strstr(line, "--- Biases ---")) break;
 
     idx = 0;
-    while (idx < CL_NUM_FILTERS && fscanf(fp, "%lf,", &conv_biases[idx]) == 1) idx++;
+    while (idx < CL_NUM_FILTERS && fscanf(fp, "%f,", &conv_biases[idx]) == 1) idx++;
     if (idx < CL_NUM_FILTERS) printf("Warning: Only loaded %u/%u conv bias values\n", idx, CL_NUM_FILTERS);
 
     // ===== Load dense_weights =====
@@ -256,14 +256,14 @@ void load_model_params() {
 
     uint32_t total_dense_weights = D_OUT_DIM * D_IN_DIM;
     idx = 0;
-    while (idx < total_dense_weights && fscanf(fp, "%lf,", &dense_weights[idx]) == 1) idx++;
+    while (idx < total_dense_weights && fscanf(fp, "%f,", &dense_weights[idx]) == 1) idx++;
     if (idx < total_dense_weights) printf("Warning: Only loaded %u/%u dense weight values\n", idx, total_dense_weights);
 
     // ===== Load dense_biases =====
     while (fgets(line, sizeof(line), fp)) if (strstr(line, "--- Biases ---")) break;
 
     idx = 0;
-    while (idx < D_OUT_DIM && fscanf(fp, "%lf,", &dense_biases[idx]) == 1) idx++;
+    while (idx < D_OUT_DIM && fscanf(fp, "%f,", &dense_biases[idx]) == 1) idx++;
     if (idx < D_OUT_DIM) printf("Warning: Only loaded %u/%u dense bias values\n", idx, D_OUT_DIM);
     fclose(fp);
 }
@@ -281,17 +281,17 @@ bool params_loaded() {
 }
 
 
-double* forward(double* input) {
+float* forward(float* input) {
     if (!params_loaded()) {
         fprintf(stderr, "Error: Model parameters not loaded.\n");
         return NULL;
     }
 
-    double* conv_out = conv2d(input, conv_filters, conv_biases);
+    float* conv_out = conv2d(input, conv_filters, conv_biases);
     ReLU(conv_out, CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS); // Apply ReLU activation
-    double* x = maxPool(conv_out);
-    double* out = flatten(x);
-    double* dense_out = dense(out, dense_weights, dense_biases);
+    float* x = maxPool(conv_out);
+    float* out = flatten(x);
+    float* dense_out = dense(out, dense_weights, dense_biases);
     softmax(dense_out, D_OUT_DIM);
 
     // -------------- CLEANUP --------------
@@ -304,7 +304,7 @@ double* forward(double* input) {
     return dense_out;
 }
 
-int read_mnist_sample(FILE* file, double* input, int image_index) {
+int read_mnist_sample(FILE* file, float* input, int image_index) {
     if (file == NULL) {
         fprintf(stderr, "Error: file pointer is NULL.\n");
         return -1;
@@ -352,7 +352,7 @@ int read_mnist_sample(FILE* file, double* input, int image_index) {
 }
 
 int main() {
-    double* input = (double*)malloc(CL_IN_DIM * CL_IN_DIM * CL_IN_CHANNELS * sizeof(double));
+    float* input = (float*)malloc(CL_IN_DIM * CL_IN_DIM * CL_IN_CHANNELS * sizeof(float));
     int correct_predictions = 0;
     load_model_params();
 
@@ -364,10 +364,10 @@ int main() {
             return -1;
         }
 
-        double* output = forward(input);
+        float* output = forward(input);
 
         // Get max value and index
-        double max_value = output[0];
+        float max_value = output[0];
         int max_index = 0;
         for (int i = 1; i < D_OUT_DIM; ++i) {
             if (output[i] > max_value) {
@@ -386,7 +386,7 @@ int main() {
     }
 
     // Print accuracy
-    printf("Accuracy: %.2f%%\n", (double)correct_predictions / 100 * 100);
+    printf("Accuracy: %.2f%%\n", (float)correct_predictions / 100 * 100);
 
     clean_params();
     if (input != NULL) {
