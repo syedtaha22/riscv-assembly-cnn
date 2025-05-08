@@ -13,14 +13,14 @@
 .global _start
 _start:
 
-    addi a0, x0, 20               # Number of elements
+    addi a0, x0, 20              # Number of elements
     li x1, 0xd0580000            # Load address for output
     la a1, a                     # Load address of first vector
     la a2, b                     # Load address of second vector
     la a3, result                # Load address for result
 
 vvaddfloat:
-    vsetvli t0, a0, e32, ta, ma   # Set vector length based on 32-bit floats
+    vsetvli t0, a0, e32, ta, ma  # Set vector length based on 32-bit floats
     vle32.v v0, (a1)             # Load first vector
     sub a0, a0, t0               # Decrement number of elements
     slli t0, t0, 2               # Multiply number of elements by 4 bytes
@@ -29,10 +29,10 @@ vvaddfloat:
     add a2, a2, t0               # Increment pointer for second vector
 
 
-    vfadd.vv v2, v0, v1           # Add vectors
+    vfadd.vv v2, v0, v1          # Add vectors
     vse32.v v2, (a3)             # Store result
     add a3, a3, t0               # Increment pointer for result
-    bnez a0, vvaddfloat           # Loop back if not done
+    bnez a0, vvaddfloat          # Loop back if not done
 
 
 _finish:
