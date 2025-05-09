@@ -24,6 +24,10 @@
  * @param biases Pointer to the bias values for each output channel (CL_NUM_FILTERS).
  * @return Pointer to the dynamically allocated output feature map (CL_NUM_FILTERS × CL_OUT_DIM × CL_OUT_DIM).
  *
+ *
+ *
+ * @note As of chore/simplify_logic: Since CL_IN_CHANNELS is 1, we can simply remove the loop, and multiplication
+ * @note As of chore/simplify_logic: Since CL_STRIDE is 1, we can simply remove the stride logic
  * @note All arrays must be stored in row-major order.
  */
 float* conv2d(float* input, float* filters, float* biases) {
@@ -35,11 +39,9 @@ float* conv2d(float* input, float* filters, float* biases) {
                 float sum = 0.0f;
                 for (uint32_t fi = 0; fi < CL_FILTER_DIM; ++fi) {
                     for (uint32_t fj = 0; fj < CL_FILTER_DIM; ++fj) {
-                        for (uint32_t c = 0; c < CL_IN_CHANNELS; ++c) {
-                            uint32_t input_index = (i * CL_STRIDE + fi) * (CL_IN_DIM * CL_IN_CHANNELS) + (j * CL_STRIDE + fj) * CL_IN_CHANNELS + c;
-                            uint32_t filter_index = k * (CL_FILTER_DIM * CL_FILTER_DIM * CL_IN_CHANNELS) + fi * (CL_FILTER_DIM * CL_IN_CHANNELS) + fj * CL_IN_CHANNELS + c;
-                            sum += input[input_index] * filters[filter_index];
-                        }
+                        uint32_t input_index = (i + fi) * (CL_IN_DIM)+(j + fj);
+                        uint32_t filter_index = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * (CL_FILTER_DIM)+fj;
+                        sum += input[input_index] * filters[filter_index];
                     }
                 }
                 uint32_t output_index = k * (CL_OUT_DIM * CL_OUT_DIM) + i * CL_OUT_DIM + j;
