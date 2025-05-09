@@ -96,27 +96,30 @@ uint32_t idx_kcfhfw(uint32_t k, uint32_t c, uint32_t fh, uint32_t fw, uint32_t C
 }
 
 
-float relu(float x) { return x > 0 ? x : 0; }
-
+/* If this gives a problem, use maxVal */
 void softmax(float* input, uint32_t size) {
-    float maxVal = *get_max_in_range(input, input + size);
+    // float maxVal = *get_max_in_range(input, input + size);
     float sum = 0.0f;
     for (uint32_t i = 0; i < size; ++i) {
-        input[i] = exp_x(input[i] - maxVal);
+        // input[i] = exp_x(input[i] - maxVal);
+        input[i] = exp_x(input[i]);
         sum += input[i];
     }
     for (uint32_t i = 0; i < size; ++i) input[i] /= sum;
 }
 
+
+
 float* conv2d(float* input, float* filters, float* biases) {
     // Allocate output array
     float* output = (float*)malloc(CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS * sizeof(float));
-    float local_output[24 * 24 * 8] = { 0 };
 
     // Perform convolution
     for (uint32_t k = 0; k < CL_NUM_FILTERS; ++k) {
         for (uint32_t i = 0; i < CL_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < CL_OUT_DIM; ++j) {
+
+                /********************************************************************************************************************/
                 float sum = 0.0f;
                 for (uint32_t fi = 0; fi < CL_FILTER_DIM; ++fi) {
                     for (uint32_t fj = 0; fj < CL_FILTER_DIM; ++fj) {
@@ -129,9 +132,9 @@ float* conv2d(float* input, float* filters, float* biases) {
                     }
                 }
                 uint32_t output_index = k * (CL_OUT_DIM * CL_OUT_DIM) + i * CL_OUT_DIM + j;
-                // uint32_t output_index = i * (cl_out_dim * cl_num_filters) + j * cl_num_filters + k;
                 output[output_index] = sum + biases[k];
-                local_output[output_index] = sum + biases[k]; // Store the result with the bias added
+                /********************************************************************************************************************/
+
             }
         }
     }
@@ -143,7 +146,7 @@ float* conv2d(float* input, float* filters, float* biases) {
 
 float* ReLU(float* input, uint32_t size) {
     for (uint32_t i = 0; i < size; ++i) {
-        input[i] = relu(input[i]);
+        input[i] = (input[i] > 0) ? input[i] : 0;
     }
     return input;
 }
@@ -156,20 +159,20 @@ float* maxPool(float* input) {
     for (uint32_t c = 0; c < MP_OUT_CHANNELS; ++c) {
         for (uint32_t i = 0; i < MP_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < MP_OUT_DIM; ++j) {
+
+
                 float maxVal = -1e9;
                 for (uint32_t di = 0; di < MP_KERNEL_DIM; ++di) {
                     for (uint32_t dj = 0; dj < MP_KERNEL_DIM; ++dj) {
-
-                        // input_index for channel-first:
                         uint32_t input_index = c * (MP_IN_DIM * MP_IN_DIM) + (i * MP_STRIDE + di) * MP_IN_DIM + (j * MP_STRIDE + dj);
-                        // uint32_t input_index = (i * MP_STRIDE + di) * (MP_IN_DIM * MP_IN_CHANNELS) + (j * MP_STRIDE + dj) * MP_IN_CHANNELS + c;
                         maxVal = get_max(maxVal, input[input_index]);
                     }
                 }
 
                 uint32_t output_index = c * (MP_OUT_DIM * MP_OUT_DIM) + i * MP_OUT_DIM + j;
-                // uint32_t output_index = i * (MP_OUT_DIM * MP_OUT_CHANNELS) + j * MP_OUT_CHANNELS + c;
                 output[output_index] = maxVal;
+
+
             }
         }
     }
@@ -195,13 +198,16 @@ float* flatten(float* input) {
 float* dense(float* input, float* weights, float* biases) {
     // Allocate output array
     float* output = (float*)malloc(D_OUT_DIM * sizeof(float));
+
     for (uint32_t i = 0; i < D_OUT_DIM; ++i) {
+
         float sum = biases[i];
         for (uint32_t j = 0; j < D_IN_DIM; ++j) {
             uint32_t index = j * D_OUT_DIM + i; // 1D index for weights
             sum += input[j] * weights[index];
         }
         output[i] = sum;
+
     }
     return output;
 }
