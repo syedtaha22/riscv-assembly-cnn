@@ -2,6 +2,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Conv2d parameters
 #define CL_IN_DIM        28     // Dimension of the input image
 #define CL_OUT_DIM       24     // Dimension of the output feature map
 #define CL_IN_CHANNELS   1      // Number of input channels (e.g., grayscale image has 1 channel)
