@@ -32,7 +32,7 @@ vvdotproduct:
 
     vfmul.vv v2, v0, v1          # Multiply vectors
 
-    # Taking v3, as the accumulator
+    # Taking v3, as the accumulator, should probably be initialized to zero first. But omitting it for now
     vfredosum.vs v3, v2, v3      # Reduce the vector to a single sum
 
     bnez a0, vvdotproduct        # Loop back if not done
