@@ -13,34 +13,42 @@
 # float* conv_biases;    // 1D array for biases:  To be initialized as a 1D array, in the .data section
 #
 #
-# float* conv2d(float* input, float* filters, float* biases) {
-#     // Allocate output array
+# float* conv2d_riscv_optimized(float* input, float* filters, float* biases) {
 #     float* output = (float*)malloc(CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS * sizeof(float));
-#     float local_output[24 * 24 * 8] = { 0 };
 #
-#     // Perform convolution
+#     // Loop over the output channels
 #     for (uint32_t k = 0; k < CL_NUM_FILTERS; ++k) {
-#         for (uint32_t i = 0; i < CL_OUT_DIM; ++i) {
-#             for (uint32_t j = 0; j < CL_OUT_DIM; ++j) {
+#         for (int i = 0; i < CL_OUT_DIM; ++i) {
+#             for (int j = 0; j < CL_OUT_DIM; ++j) {
 #                 float sum = 0.0f;
-#                 for (uint32_t fi = 0; fi < CL_FILTER_DIM; ++fi) {
-#                     for (uint32_t fj = 0; fj < CL_FILTER_DIM; ++fj) {
-#                         for (uint32_t c = 0; c < CL_IN_CHANNELS; ++c) {
-#                             uint32_t input_index = (i * CL_STRIDE + fi) * (CL_IN_DIM * CL_IN_CHANNELS) + (j * CL_STRIDE + fj) * CL_IN_CHANNELS + c;
 #
-#                             uint32_t filter_index = k * (CL_FILTER_DIM * CL_FILTER_DIM * CL_IN_CHANNELS) + fi * (CL_FILTER_DIM * CL_IN_CHANNELS) + fj * CL_IN_CHANNELS + c;
-#                             sum += input[input_index] * filters[filter_index];
-#                         }
-#                     }
+#                 for (int fi = 0; fi < CL_FILTER_DIM; fi++) {
+#                     // This can all be done in a single loop, but I am keeping it seperate because, in RISC-V,
+#                     // vector extension, each of this is one instruction
+#
+#                     // We'll do a strided load using vlse.v
+#                     float input_patch[CL_FILTER_DIM];
+#                     int input_row = (i * CL_STRIDE + fi) * CL_IN_DIM + j * CL_STRIDE;
+#                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) input_patch[fj] = input[input_row + fj];
+#
+#                     // This is a single instruction in RISC-V vector extension, vlse.v
+#                     float filter_patch[CL_FILTER_DIM];
+#                     int filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM;
+#                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) filter_patch[fj] = filters[filter_row + fj];
+#
+#                     // And this in risc-v is also a single instruction vfmacc.vv
+#                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) sum += input_patch[fj] * filter_patch[fj];
 #                 }
+#
+#                 // Add bias
+#                 sum += biases[k];
+#
+#                 // Store result
 #                 uint32_t output_index = k * (CL_OUT_DIM * CL_OUT_DIM) + i * CL_OUT_DIM + j;
-#                 // uint32_t output_index = i * (cl_out_dim * cl_num_filters) + j * cl_num_filters + k;
-#                 output[output_index] = sum + biases[k];
-#                 local_output[output_index] = sum + biases[k]; // Store the result with the bias added
+#                 output[output_index] = sum;
 #             }
 #         }
 #     }
-#
 #     return output;
 # }
 #
@@ -53,11 +61,107 @@
 .global _start
 
 conv2d:
-    addi a0, x0, 20              # Number of elements
+    # addi a0, x0, 20              # Number of elements
     li x1, 0xd0580000            # Load address for output
-    la a1, a                     # Load address of first vector
-    la a2, b                     # Load address of second vector
-    la a3, result                # Load address for result
+
+
+    # Arguments to the function
+    la a0, input_image           # Load address for input image
+    la a1, conv_filters          # Load address of filters
+    la a2, conv_biases           # Load address for biases
+
+    # Load addresses for global variables
+    la a3, CL_IN_DIM             # Load address of input dimensions
+    la a4, CL_OUT_DIM            # Load address of output dimensions
+    la a5, CL_NUM_FILTERS        # Load address of number of filters
+    la a6, CL_FILTER_DIM         # Load address of filter dimensions
+    la a7, CL_STRIDE             # Load address of stride
+    la s3, result                # Load address for result
+
+    lw a3, 0(a3)                 # Load input dimension
+    lw a4, 0(a4)                 # Load output dimension
+    lw a5, 0(a5)                 # Load number of filters
+    lw a6, 0(a6)                 # Load filter dimension
+    lw a7, 0(a7)                 # Load stride
+
+    # Loop over the CL_NUM_FILTERS
+    li t1, 0                     # k = 0
+    loop_k:
+        bge t1, a5, loop_k_end   # if k >= CL_NUM_FILTERS, exit
+
+        # Loop over the output dimensions
+        li t2, 0                 # i = 0
+        loop_i:
+            bge t2, a4, loop_i_end   # if i >= CL_OUT_DIM, exit
+
+            li t3, 0                 # j = 0
+            loop_j:
+                bge t3, a4, loop_j_end   # if j >= CL_OUT_DIM, exit
+
+                vsetvli t0, a6, e32, m1  # vector length = FILTER_DIM
+                vmv.v.x v0, x0       # Set all elements of v0 to zero
+
+                li t4, 0                 # fi = 0
+                conv_row:
+                    bge t4, a6, conv_end     # if fi >= FILTER_DIM, break
+
+                    # input_row = (i + fi) * CL_IN_DIM + j                             (since stride = 1)
+                    add  t5, t2, t4           # input_row = i + fi
+                    mul  t5, t5, a3           # input_row *= CL_IN_DIM
+                    add  t5, t5, t3           # input_row += input_row + j
+                    slli t5, t5, 2            # byte offset = *4
+                    add  t5, a0, t5           # &image[row_offset]
+
+                    # Load input row with stride = 29
+                    li s1, 4 # Come back to this. TODO
+                    vsetvli t0, a6, e32, m1     # vector length = FILTER_DIM
+                    vle32.v v1, 0(t5)      # input patch row
+
+                    # filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM
+                    # filter_row = (k * CL_FILTER_DIM + fi) * CL_FILTER_DIM                 (take CL_)
+                    mul t6, t1, a6         # k * FD
+                    add t6, t6, t4         # + fi
+                    mul t6, t6, a6         # * FD
+
+                    slli t6, t6, 2            # byte offset = *4
+                    add  t6, a1, t6           # &filter_row
+
+
+                    # Load filter row (contiguous memory)
+                    vle32.v v2, 0(t6)         # filter row
+
+                    # Accumulate dot product
+                    vfmacc.vv v0, v1, v2
+
+                    addi t4, t4, 1           # fi++
+                    j conv_row
+                conv_end:
+                    # Sum reduction
+                    vsetvli t0, a6, e32, m1
+                    
+                    # Calculate bias index: bias addess + k
+                    slli t6, t1, 2            # byte offset = *4
+                    add t6, a2, t6           # &bias[k]
+                    lw t6, 0(t6)             # Load bias value
+
+                    vmv.s.x v3, t6           # Initialize v3 with bias
+                    vfredsum.vs v3, v0, v3
+
+                    # Store result
+                    # vse32.v v3, 0(s3)       # Store result
+                    vmv.x.s t0, v3         # Extract scalar from v3[0]
+                    sw t0, 0(s3)           # Store single float
+                    addi s3, s3, 4          # Increment result pointer
+
+                    addi t3, t3, 1           # j++
+                    j loop_j
+            loop_j_end:
+                addi t2, t2, 1               # i++
+                j loop_i
+        loop_i_end:
+            addi t1, t1, 1               # k++
+            j loop_k
+    loop_k_end:
 
 
 _finish:
@@ -71,12 +175,13 @@ _finish:
 
 
 .data
+.align 4
 
 # Definitions from #define (from the C code)
 CL_IN_DIM:         .word 28              # Input dimension (28x28)
 CL_OUT_DIM:        .word 24              # Output dimension (24x24)
 CL_IN_CHANNELS:    .word 01              # Input channels (1)
-CL_NUM_FILTERS:    .word 08              # Number of filters (8)
+CL_NUM_FILTERS:    .word 8              # Number of filters (8)
 CL_FILTER_DIM:     .word 05              # Filter dimension (5x5)
 CL_STRIDE:         .word 01              # Stride (1)
 
@@ -134,4 +239,35 @@ conv_biases:
     .float  -0.459817,  0.177505, -0.325453, -0.026671, -0.118034, -0.147214, -0.541557, -0.005194
 
 input_image:
-    # Initialize image here.
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.333, 0.667, 0.996, 1.000, 0.996, 0.557, 0.086, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.067, 0.529, 0.988, 0.992, 0.882, 0.847, 0.922, 0.992, 0.808, 0.094, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.459, 0.992, 0.992, 0.878, 0.059, 0.000, 0.114, 0.655, 0.992, 0.439, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.055, 0.863, 0.992, 0.733, 0.051, 0.000, 0.000, 0.000, 0.039, 0.992, 0.439, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.392, 0.992, 0.929, 0.055, 0.000, 0.000, 0.000, 0.082, 0.843, 0.992, 0.169, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.553, 0.992, 0.659, 0.000, 0.000, 0.000, 0.000, 0.612, 0.992, 0.992, 0.439, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.431, 0.992, 0.659, 0.000, 0.000, 0.000, 0.431, 0.961, 0.992, 0.992, 0.439, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.078, 0.882, 0.659, 0.000, 0.027, 0.361, 0.996, 0.992, 0.992, 0.992, 0.518, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.631, 0.941, 0.627, 0.808, 0.992, 0.996, 0.835, 0.843, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.141, 0.745, 0.992, 0.992, 0.992, 0.761, 0.071, 0.408, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.125, 0.373, 0.643, 0.373, 0.000, 0.000, 0.408, 0.996, 0.443, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.353, 0.992, 0.627, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.039, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.039, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.039, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.039, 0.992, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.012, 0.757, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.663, 0.808, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.663, 0.965, 0.157, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.663, 0.992, 0.184, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+    .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+
+
+result:
+    .space  24 * 24 * 8 * 4        # Space for output (24x24x8) in bytes
