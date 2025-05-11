@@ -42,14 +42,14 @@ float* conv2d_riscv_optimized(float* input, float* filters, float* biases) {
                     // This can all be done in a single loop, but I am keeping it seperate because, in RISC-V,
                     // vector extension, each of this is one instruction
 
+                    int input_row = (i * CL_STRIDE + fi) * CL_IN_DIM + j * CL_STRIDE;
                     // We'll do a strided load using vlse.v
                     float input_patch[CL_FILTER_DIM];
-                    int input_row = (i * CL_STRIDE + fi) * CL_IN_DIM + j * CL_STRIDE;
                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) input_patch[fj] = input[input_row + fj];
 
+                    int filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM;
                     // This is a single instruction in RISC-V vector extension, vlse.v
                     float filter_patch[CL_FILTER_DIM];
-                    int filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM;
                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) filter_patch[fj] = filters[filter_row + fj];
 
                     // And this in risc-v is also a single instruction vfmacc.vv
