@@ -50,7 +50,6 @@ def display_floats(values, shape=None, channel_view=False):
             print(f"{value:.3f}", end=" ")
         print()
 
-# Example usage
 if __name__ == "__main__":
     filename = "riscv/build/logs/main.txt"
     instruction = "vfmax"
