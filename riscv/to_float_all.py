@@ -33,7 +33,8 @@ values = extract_vfredsum_values(filename)
 
 for value in values:
     print(f"{value:.3f}", end=" ")
-
+    
+print()
 # for channel in range(8):
 #     print(f"\nChannel {channel}:")
 #     for i in range(24):
