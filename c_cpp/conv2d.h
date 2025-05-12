@@ -36,7 +36,7 @@ float* conv2d_riscv_optimized(float* input, float* filters, float* biases) {
     for (uint32_t k = 0; k < CL_NUM_FILTERS; ++k) {
         for (int i = 0; i < CL_OUT_DIM; ++i) {
             for (int j = 0; j < CL_OUT_DIM; ++j) {
-                float sum = 0.0f;
+                float sum = biases[k];
 
                 for (int fi = 0; fi < CL_FILTER_DIM; fi++) {
                     // This can all be done in a single loop, but I am keeping it seperate because, in RISC-V,
@@ -55,9 +55,6 @@ float* conv2d_riscv_optimized(float* input, float* filters, float* biases) {
                     // And this in risc-v is also a single instruction vfmacc.vv
                     for (int fj = 0; fj < CL_FILTER_DIM; fj++) sum += input_patch[fj] * filter_patch[fj];
                 }
-
-                // Add bias
-                sum += biases[k];
 
                 // Store result
                 uint32_t output_index = k * (CL_OUT_DIM * CL_OUT_DIM) + i * CL_OUT_DIM + j;
@@ -96,7 +93,7 @@ float* conv2d(float* input, float* filters, float* biases) {
     for (uint32_t k = 0; k < CL_NUM_FILTERS; ++k) {
         for (uint32_t i = 0; i < CL_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < CL_OUT_DIM; ++j) {
-                float sum = 0.0f;
+                float sum = biases[k];
                 for (uint32_t fi = 0; fi < CL_FILTER_DIM; ++fi) {
                     // Compute base index for the input patch row
                     uint32_t input_row_base = (i * CL_STRIDE + fi) * CL_IN_DIM + (j * CL_STRIDE);
@@ -107,8 +104,6 @@ float* conv2d(float* input, float* filters, float* biases) {
                         sum += input_val * filter_val;
                     }
                 }
-                // Add bias
-                sum += biases[k];
                 // Store result
                 uint32_t output_index = k * (CL_OUT_DIM * CL_OUT_DIM) + i * CL_OUT_DIM + j;
                 output[output_index] = sum;
