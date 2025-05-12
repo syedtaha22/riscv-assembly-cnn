@@ -53,7 +53,7 @@ def display_floats(values, shape=None, channel_view=False):
 # Example usage
 if __name__ == "__main__":
     filename = "riscv/build/logs/main.txt"
-    instruction = "vfredsum"
+    instruction = "vfmax"
     
     values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredsum"))
 
