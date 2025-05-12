@@ -1,6 +1,6 @@
-# RISC-V Vectorized Neural Network (RV-VNN)
+# RISC-V Vectorized Convolutional Neural Network (RV-VCNN)
 
-Implementation of a Convolutional Neural Network (CNN) **entirely in RISC-V assembly**, using the **Vector Extension (RVV)** for parallel computation. This project demonstrates how a compact, trained CNN model can be mapped to low-level RISC-V operations for execution on custom or simulated hardware environments.
+Implementation of a Convolutional Neural Network (CNN) **in RISC-V assembly**, using the **Vector Extension (RVV)** for parallel computation. This project demonstrates how a compact, trained CNN model can be mapped to low-level RISC-V operations for execution on custom or simulated hardware environments.
 
 ---
 
