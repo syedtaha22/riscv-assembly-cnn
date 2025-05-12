@@ -29,16 +29,23 @@ static float exp_x(int x) {
 
 /**
  * @brief Computes the softmax of a given input array.
+ *
+ * Structured for direct mapping to riscv-vector instructions
+ *
  * @param input Pointer to the input array.
  * @param size Size of the input array.
  * @note The input array is modified in place to contain the softmax values.
  */
 void softmax(float* input, uint32_t size) {
+
+    // Compute the exponential of each element
+    for (uint32_t i = 0; i < size; ++i) input[i] = exp_x(input[i]);
+
+    // Can be reduced to vfredosum.vv
     float sum = 0.0f;
-    for (uint32_t i = 0; i < size; ++i) {
-        input[i] = exp_x(input[i]);
-        sum += input[i];
-    }
+    for (uint32_t i = 0; i < size; ++i) sum += input[i];
+
+    // Can be mapped to vfdiv.vf
     for (uint32_t i = 0; i < size; ++i) input[i] /= sum;
 }
 
