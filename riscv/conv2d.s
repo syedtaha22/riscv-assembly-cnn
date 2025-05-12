@@ -7,11 +7,6 @@
 # Return:
 #   result pointer (s3 will hold the address of the result)
 conv2d:
-    # Save registers that will be used
-    addi sp, sp, -16            # Make space on the stack for saved registers
-    sw ra, 0(sp)                # Save return address
-    sw s3, 4(sp)                # Save result pointer (s3)
-
     # Load addresses for global variables
     la a1, conv_filters         # Load address of filters
     la a2, conv_biases          # Load address of biases
@@ -21,6 +16,11 @@ conv2d:
     la a6, CL_FILTER_DIM        # Load address of filter dimensions
     la a7, CL_STRIDE            # Load address of stride
     la s3, result               # Load address for result
+
+    # Save registers that will be used
+    addi sp, sp, -16            # Make space on the stack for saved registers
+    sw ra, 0(sp)                # Save return address
+    sw s3, 4(sp)                # Save result pointer (s3)
 
     lw a3, 0(a3)                # Load input dimension
     lw a4, 0(a4)                # Load output dimension
