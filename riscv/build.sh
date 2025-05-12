@@ -10,7 +10,7 @@ OUT_DIRS=("exe" "hex" "dis" "logs")
 # =================================================
 
 show_help() {
-    echo "Usage: $0 [options] <file.s>"
+    echo "Usage: $0 [options] <file.s> [<file.s> ...]"
     echo
     echo "Options:"
     echo "  -a         Compile and execute"
@@ -19,7 +19,7 @@ show_help() {
     echo "  -h         Show this help message"
     echo
     echo "Example:"
-    echo "  $0 -a vvaddint32.s"
+    echo "  $0 -a main.s -l conv2d.s -l dense.s"
 }
 
 make_dirs() {
@@ -34,19 +34,37 @@ get_basename() {
 }
 
 compile() {
-    input_file="$1"
-    if [[ ! -f "$input_file" ]]; then
-        echo "Error: $input_file not found."
+    input_files=()
+    # Extract files and add to the source files list
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -l)
+                shift
+                input_files+=("$1")  # Add the file after -l to the source files
+                ;;
+            *)
+                input_files+=("$1")  # Add the file to the source files
+                ;;
+        esac
+        shift
+    done
+
+    # Check if at least one file is provided
+    if [[ ${#input_files[@]} -eq 0 ]]; then
+        echo "Error: No files provided to compile."
         exit 1
     fi
 
-    base=$(get_basename "$input_file")
+    # Create file names based on input files
+    base=$(get_basename "${input_files[0]}")
     exe="${BUILD_DIR}/exe/${base}.exe"
     hex="${BUILD_DIR}/hex/${base}.hex"
     dis="${BUILD_DIR}/dis/${base}.dis"
 
-    echo "[*] Compiling $input_file ..."
-    $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "$input_file" -nostartfiles -lm
+    echo "[*] Compiling files: ${input_files[*]} ..."
+
+    # Compile and link all the files together
+    $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "${input_files[@]}" -nostartfiles -lm
     $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
     $GCC_PREFIX-objdump -S "$exe" > "$dis"
     echo "[+] Output: $exe, $hex, $dis"
@@ -85,6 +103,8 @@ if [[ $# -eq 0 ]]; then
     exit 1
 fi
 
+ACTION=""
+
 while getopts "aceh" opt; do
     case $opt in
         a) ACTION="all" ;;
@@ -94,25 +114,25 @@ while getopts "aceh" opt; do
         *) show_help; exit 1 ;;
     esac
 done
-shift $((OPTIND -1))
+shift $((OPTIND - 1))
 
 make_dirs
 
 case "$ACTION" in
     all)
-        if [[ $# -ne 1 ]]; then
-            echo "Error: Please provide a .s file."
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Please provide at least one .s file."
             show_help
             exit 1
         fi
-        compile "$1"
+        compile "$@"
         execute "$1"
         ;;
     clean)
         clean
         ;;
     exec)
-        if [[ $# -ne 1 ]]; then
+        if [[ $# -lt 1 ]]; then
             echo "Error: Please provide a .s file for execution."
             show_help
             exit 1
