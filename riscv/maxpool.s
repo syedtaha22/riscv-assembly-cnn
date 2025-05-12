@@ -18,9 +18,9 @@ _start:
     
     li    s0, 0             # channel index
     
-1:  # Channel loop
+channel_loop:
     bge   s0, t4, _finish
-    
+        
     # Compute per-channel input base address
     slli  t5, t0, 2
     mul   t6, t5, t0
@@ -35,113 +35,113 @@ _start:
     
     li    s5, 0             # output-row index
     
-2:  # Row loop
-    bge   s5, t3, next_chan
-    
-    li    s9, 0             # output-column index
-    
-3:  # Column loop (vectorized)
-    sub   t5, t3, s9        # Calculate remaining columns
-    vsetvli t6, t5, e32, m8, ta, ma  # Set vector length for this iteration
-    
-    # Initialize vector with negative infinity
-    flw   ft0, 0(s8)
-    vfmv.v.f v0, ft0
-    
-    li    s6, 0             # kernel-row index
-    
-4:  # Kernel row loop
-    bge   s6, t1, store_vec_results
-    li    s7, 0             # kernel-col index
-    
-5:  # Kernel column loop
-    bge   s7, t1, next_krow
-    
-    li    t5, 0             # Vector element counter
+    row_loop:  
+        bge   s5, t3, next_chan
+        
+        li    s9, 0             # output-column index
+        
+        vColumn_loop:  # Column loop (vectorized)
+            sub   t5, t3, s9        # Calculate remaining columns
+            vsetvli t6, t5, e32, m8, ta, ma  # Set vector length for this iteration
+            
+            # Initialize vector with negative infinity
+            flw   ft0, 0(s8)
+            vfmv.v.f v0, ft0
+            
+            li    s6, 0             # kernel-row index
+            
+            kRow_loop:  # Kernel row loop
+                bge   s6, t1, store_vec_results
+                li    s7, 0             # kernel-col index
+                
+                kColumn_loop:  # Kernel column loop
+                    bge   s7, t1, next_krow
+                    
+                    li    t5, 0             # Vector element counter
 
-6:  # Process each vector element for this kernel position
-    bge   t5, t6, next_kcol
-    
-    # Compute input address for this vector element
-    mul   s10, s5, t2       # i * stride
-    add   s10, s10, s6      # i*stride + di
-    mul   s10, s10, t0      # (i*stride + di) * input_width
-    add   s11, s9, t5       # j + vector_element_index
-    mul   s11, s11, t2      # (j+vec_idx) * stride
-    add   s11, s11, s7      # (j+vec_idx)*stride + dj
-    add   s10, s10, s11     # Full 2D index
-    slli  s10, s10, 2       # Convert to byte offset
-    add   s10, s1, s10      # Final input address
-    
-    flw   ft1, 0(s10)       # Load input value
-    
-    # Insert into vector at position t5
-    vfmv.s.f v24, ft1
-    vslideup.vi v16, v24, 0
-    vslideup.vx v8, v16, t5
-    
-    addi  t5, t5, 1
-    j     6b
-    
-next_kcol:
-    # Take max of current values and new values
-    vfmax.vv v0, v0, v8
-    
-    addi  s7, s7, 1
-    j     5b
-    
-next_krow:
-    addi  s6, s6, 1
-    j     4b
-    
-store_vec_results:
-    # Compute output address
-    mul   t5, s5, t3
-    add   t5, t5, s9
-    slli  t5, t5, 2
-    add   t5, s4, t5
-    
-    # Store vector result
-    vse32.v v0, (t5)
-    
-    li    t5, 0             # Element counter for scalar stores
-    
-store_individual:
-    bge   t5, t6, done_storing
-    
-    # Compute individual element address
-    mul   s10, s5, t3
-    add   s10, s10, s9
-    add   s10, s10, t5
-    slli  s10, s10, 2
-    add   s10, s4, s10
-    
-    # Store scalar value
-    vfmv.f.s ft0, v0
-    fsw   ft0, 0(s10)
-    
-    addi  t5, t5, 1
-    vslidedown.vi v0, v0, 1  # Shift vector down for next element
-    j    store_individual
-    
-done_storing:
-    add   s9, s9, t6        # Move to next block of columns
-    blt   s9, t3, 3b
-    
-    addi  s5, s5, 1         # Next row
-    j     2b
-    
-next_chan:
-    addi  s0, s0, 1         # Next channel
-    j     1b
-    
-_finish:
-    li    x3, 0xd0580000
-    addi  x5, x0, 0xff
-    sb    x5, 0(x3)
-    
-finish_loop:
-    beq   x0, x0, finish_loop    # Infinite loop at end
+                    vector_process:  # Process each vector element for this kernel position
+                        bge   t5, t6, next_kcol
+                        
+                        # Compute input address for this vector element
+                        mul   s10, s5, t2       # i * stride
+                        add   s10, s10, s6      # i*stride + di
+                        mul   s10, s10, t0      # (i*stride + di) * input_width
+                        add   s11, s9, t5       # j + vector_element_index
+                        mul   s11, s11, t2      # (j+vec_idx) * stride
+                        add   s11, s11, s7      # (j+vec_idx)*stride + dj
+                        add   s10, s10, s11     # Full 2D index
+                        slli  s10, s10, 2       # Convert to byte offset
+                        add   s10, s1, s10      # Final input address
+                        
+                        flw   ft1, 0(s10)       # Load input value
+                        
+                        # Insert into vector at position t5
+                        vfmv.s.f v24, ft1
+                        vslideup.vi v16, v24, 0
+                        vslideup.vx v8, v16, t5
+                        
+                        addi  t5, t5, 1
+                        j     vector_process
+                        
+                    next_kcol:
+                        # Take max of current values and new values
+                        vfmax.vv v0, v0, v8
+                        
+                        addi  s7, s7, 1
+                        j     kColumn_loop
+                        
+                    next_krow:
+                        addi  s6, s6, 1
+                        j     kRow_loop
+                        
+                    store_vec_results:
+                        # Compute output address
+                        mul   t5, s5, t3
+                        add   t5, t5, s9
+                        slli  t5, t5, 2
+                        add   t5, s4, t5
+                        
+                        # Store vector result
+                        vse32.v v0, (t5)
+                        
+                        li    t5, 0             # Element counter for scalar stores
+                        
+                    store_individual:
+                        bge   t5, t6, done_storing
+                        
+                        # Compute individual element address
+                        mul   s10, s5, t3
+                        add   s10, s10, s9
+                        add   s10, s10, t5
+                        slli  s10, s10, 2
+                        add   s10, s4, s10
+                        
+                        # Store scalar value
+                        vfmv.f.s ft0, v0
+                        fsw   ft0, 0(s10)
+                        
+                        addi  t5, t5, 1
+                        vslidedown.vi v0, v0, 1  # Shift vector down for next element
+                        j    store_individual
+                        
+                    done_storing:
+                        add   s9, s9, t6        # Move to next block of columns
+                        blt   s9, t3, vColumn_loop
+                        
+                        addi  s5, s5, 1         # Next row
+                        j     row_loop
+                        
+                    next_chan:
+                        addi  s0, s0, 1         # Next channel
+                        j     channel_loop
+                        
+                    _finish:
+                        li    x3, 0xd0580000
+                        addi  x5, x0, 0xff
+                        sb    x5, 0(x3)
+                        
+                    finish_loop:
+                        beq   x0, x0, finish_loop    # Infinite loop at end
 
 .section .data
 input:
