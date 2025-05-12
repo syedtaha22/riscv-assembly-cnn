@@ -1,7 +1,7 @@
 import struct
 
 # Input hex string
-hex_string = "3d988a8b3d1b8dc53db78d50bd14d1e9be4c6da43d2c69b63e3e963e3d914c23"
+hex_string = "beeb6d22beeb6d22beeb6d22beeb6d22beec8f54beff0825befa2ee4beff96e1"
 
 # Ensure hex string has a length that's a multiple of 8 characters (4 bytes)
 if len(hex_string) % 8 != 0:
