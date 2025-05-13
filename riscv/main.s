@@ -7,6 +7,7 @@
 .extern relu        # Function to perform ReLU activation
 .extern maxpool     # Function to perform max pooling
 .extern flatten     # Function to flatten the input
+.extern dense       # Function to perform dense layer operation
 
 # Main function
 _start:
@@ -14,22 +15,18 @@ _start:
 
     # Prepare to call conv2d
     la a0, input_image           # Load address of input image (passed to conv2d)
-    call conv2d                  # Call conv2d function, s3 will hold the result pointer
-
-
-    addi a0, s3, 0               # Load address of the result (output of conv2d)
-    li a1, 4608                  # Number of elements in the input image
-    call relu                    # Call relu function
-
+    
+    call conv2d                  # Call conv2d function, s0 will hold the result pointer
+    call relu                    # Call relu function, output is saved back to a0
     call maxpool                 # Call maxpool function on input a0, output is saved back to a0
-
     call flatten                 # Call flatten function on input a0, output is saved back to a0
+    call dense                   # Call dense function on input a0, output is saved back to a0
     
     j _finish                     # Jump to _finish
 
 _finish:
     li x3, 0xd0580000
-    addi x5, x0, 0xff
+    addi x5, x0, 0x1              # Signal 1 to end program
     sb x5, 0(x3)
     beq x0, x0, _finish
 .rept 100
