@@ -51,8 +51,8 @@ def display_floats(values, shape=None, channel_view=False):
         print()
 
 if __name__ == "__main__":
-    filename = "riscv/build/logs/maxpool.txt"
-    instruction = "vle32.v v0, (a1)"
+    filename = "riscv/build/logs/main.txt"
+    instruction = "vfredmax"  # Change to "vlse32" or "vfredmax" as needed
     
     values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredmax"))
 
