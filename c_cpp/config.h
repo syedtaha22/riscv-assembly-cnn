@@ -27,9 +27,6 @@
 #define D_IN_DIM         1152   // Dimension of the input feature map (flattened)
 #define D_OUT_DIM        10     // Dimension of the output (number of classes)
 
-
-#define EULER_NUMBER     2.718281828459045 // Euler's number for softmax calculation
-
 /* Model parameters */
 float* conv_filters;   // 4D array for filters
 float* conv_biases;    // 1D array for biases

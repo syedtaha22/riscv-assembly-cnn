@@ -3,28 +3,29 @@
 
 #include <stdint.h>     // for uint32_t
 
-// Euler's number for softmax calculation
-#define EULER_NUMBER     2.718281828459045
-
 /**
- * @brief Computes the exponential of a given integer.
+ * @brief Computes the exponential of a given double using Taylor series expansion.
  *
- * This function computes the power of Euler's number (e) raised to the given integer x.
- * It handles both positive and negative integers.
+ * This function computes the power of Euler's number (e) raised to the given double x
+ * using Taylor series expansion. It is more accurate for small values of x.
  *
- * Defined as a static function to limit its scope to this file.
+ * Provides a better mapping over to the RISC-V vector instructions.
  *
- * @param x The integer to compute the exponential of.
+ * @param x The double to compute the exponential of.
+ * @param terms The number of terms to use in the Taylor series expansion.
  * @return The computed exponential value.
- * @note This function uses a simple loop to compute the power of Euler's number.
+ *
  */
-static float exp_x(int x) {
-    float result = 1.0;
-    int abs_x = x;
-    if (x < 0) abs_x = -x;
-    for (int i = 0; i < abs_x; ++i) result *= EULER_NUMBER;
-    if (x < 0) return 1.0 / result;
-    else return result;
+static float exp_taylor(double x, int terms) {
+    double result = 1.0;
+    double term = 1.0;
+
+    for (int i = 1; i < terms; ++i) {
+        term *= x / i;
+        result += term;
+    }
+
+    return result;
 }
 
 /**
@@ -38,8 +39,8 @@ static float exp_x(int x) {
  */
 void softmax(float* input, uint32_t size) {
 
-    // Compute the exponential of each element
-    for (uint32_t i = 0; i < size; ++i) input[i] = exp_x(input[i]);
+    // Compute the exponential of each element, vfmul.vv, vfadd.vv, vfdiv.vv
+    for (uint32_t i = 0; i < size; ++i) input[i] = exp_taylor(input[i], 1000);
 
     // Can be reduced to vfredosum.vv
     float sum = 0.0f;
@@ -48,7 +49,6 @@ void softmax(float* input, uint32_t size) {
     // Can be mapped to vfdiv.vf
     for (uint32_t i = 0; i < size; ++i) input[i] /= sum;
 }
-
 
 /**
  * @brief Applies the ReLU activation function to a given input array.
