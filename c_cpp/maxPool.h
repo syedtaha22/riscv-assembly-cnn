@@ -6,20 +6,22 @@
 
 #include "config.h"    // for MP_IN_DIM, MP_OUT_DIM, etc.
 
-
 /**
- * @brief Computes the maximum of two floating-point numbers.
+ * @brief Finds the maximum value in a range of a 1D array.
  *
- * This function returns the maximum of two floating-point numbers.
- * Defined as a static function to limit its scope to this file.
+ * This function takes a pointer to the start and end of a range in a 1D array
+ * and returns a pointer to the maximum value in that range.
  *
- * @param a First floating-point number.
- * @param b Second floating-point number.
- * @return The maximum of a and b.
- *
- * @note This function is used internally for the max pooling operation.
+ * @param start Pointer to the start of the range.
+ * @param end Pointer to the end of the range.
+ * @return Pointer to the maximum value in the range.
  */
-static float get_max(float a, float b) { return a > b ? a : b; }
+float* get_max_in_range(float* start, float* end) {
+    float* maxPtr = start;
+    for (float* ptr = start; ptr < end; ++ptr) if (*ptr > *maxPtr) maxPtr = ptr;
+    return maxPtr;
+}
+
 
 /**
  * @brief Performs 2D max pooling on multi-channel input data.
@@ -33,6 +35,8 @@ static float get_max(float a, float b) { return a > b ? a : b; }
  * (channels × output height × output width). It is the caller's responsibility to deallocate
  * the returned memory to avoid memory leaks.
  *
+ * Optimized for RISC-V vector extension. Maps directly to riscv-vector instructions.
+ *
  * @param input Pointer to the flattened input data array (MP_IN_CHANNELS × MP_IN_DIM × MP_IN_DIM).
  * @return Pointer to the dynamically allocated output feature map. (MP_OUT_CHANNELS × MP_OUT_DIM × MP_OUT_DIM).
  *
@@ -45,21 +49,28 @@ float* maxPool(float* input) {
 
     // Perform max pooling
     for (uint32_t c = 0; c < MP_OUT_CHANNELS; ++c) {
+        uint32_t input_channel_offset = c * (MP_IN_DIM * MP_IN_DIM);
+        uint32_t output_channel_offset = c * (MP_OUT_DIM * MP_OUT_DIM);
+
         for (uint32_t i = 0; i < MP_OUT_DIM; ++i) {
             for (uint32_t j = 0; j < MP_OUT_DIM; ++j) {
 
+                // Loop structured for direct mapping to riscv-vector extension
+                // This maps to strided segment load in the vector extension
+                // vlsseg2e32.v
+                float input_batch[MP_KERNEL_DIM * MP_KERNEL_DIM];
 
-                float maxVal = -1e9;
                 for (uint32_t di = 0; di < MP_KERNEL_DIM; ++di) {
                     for (uint32_t dj = 0; dj < MP_KERNEL_DIM; ++dj) {
-                        uint32_t input_index = c * (MP_IN_DIM * MP_IN_DIM) + (i * MP_STRIDE + di) * MP_IN_DIM + (j * MP_STRIDE + dj);
-                        maxVal = get_max(maxVal, input[input_index]);
+                        input_batch[di * MP_KERNEL_DIM + dj] = input[input_channel_offset + (i * MP_STRIDE + di) * MP_IN_DIM + (j * MP_STRIDE + dj)];
                     }
                 }
 
-                uint32_t output_index = c * (MP_OUT_DIM * MP_OUT_DIM) + i * MP_OUT_DIM + j;
-                output[output_index] = maxVal;
+                // Maps to vfredmax.vs
+                float maxVal = *get_max_in_range(input_batch, input_batch + (MP_KERNEL_DIM * MP_KERNEL_DIM));
 
+                uint32_t output_index = output_channel_offset + i * MP_OUT_DIM + j;
+                output[output_index] = maxVal;
 
             }
         }

@@ -38,22 +38,6 @@ void print_output_vector(float* vec, uint32_t width, uint32_t height, uint32_t d
     }
 }
 
-/**
- * @brief Finds the maximum value in a range of a 1D array.
- *
- * This function takes a pointer to the start and end of a range in a 1D array
- * and returns a pointer to the maximum value in that range.
- *
- * @param start Pointer to the start of the range.
- * @param end Pointer to the end of the range.
- * @return Pointer to the maximum value in the range.
- */
-float* get_max_in_range(float* start, float* end) {
-    float* maxPtr = start;
-    for (float* ptr = start; ptr < end; ++ptr) if (*ptr > *maxPtr) maxPtr = ptr;
-    return maxPtr;
-}
-
 
 /**
  * @brief Finds the index of the maximum value in a range of a 1D array.
