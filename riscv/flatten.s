@@ -1,5 +1,5 @@
 .section .text
-.global .flatten
+.global flatten
 
 # Function: flatten
 # Arguments:
