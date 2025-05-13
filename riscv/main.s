@@ -6,6 +6,8 @@
 .extern conv2d   # Function to perform 2D convolution
 .extern relu      # Function to perform ReLU activation
 
+.extern flatten   # Function to flatten the input
+
 # Main function
 _start:
     li x0, 0xd0580000            # Load address for output
@@ -18,6 +20,7 @@ _start:
     addi a0, s3, 0               # Load address of the result (output of conv2d)
     li a1, 4608                  # Number of elements in the input image
     call relu                    # Call relu function
+    
 
     j _finish                     # Jump to _finish
 
