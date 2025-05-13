@@ -22,8 +22,9 @@ _start:
     call relu                    # Call relu function
 
     call maxpool                 # Call maxpool function on input a0, output is saved back to a0
-    
 
+    call flatten                 # Call flatten function on input a0, output is saved back to a0
+    
     j _finish                     # Jump to _finish
 
 _finish:

@@ -52,12 +52,20 @@ def display_floats(values, shape=None, channel_view=False):
 
 if __name__ == "__main__":
     filename = "riscv/build/logs/main.txt"
-    instruction = "vfredmax"  # Change to "vlse32" or "vfredmax" as needed
+    instruction = "vlse32.v v0, (s5), s2"  # Change to "vlse32" or "vfredmax" as needed
     
     values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredmax"))
 
+    # # get the last 4608 values
+    # print(len(values), "values before slicing")
+    # values = values[-4608:]
+
+    # print(len(values), "values extracted")
+
+
     display_floats(
         values,
-        shape=(8,12,12),              # e.g., (8, 24, 24) if reshaping
-        channel_view=True       # Set True if using (C, H, W)
+        # shape=(8,12,12),              # e.g., (8, 24, 24) if reshaping
+        shape=None,
+        channel_view=False       # Set True if using (C, H, W)
     )
