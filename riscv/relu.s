@@ -14,6 +14,9 @@ relu:
     sw ra, 0(sp)
     sw a0, 4(sp)                # Save input array pointer
 
+    la a1, RELU_IN_ELEMENTS   # Load number of elements
+    lw a1, 0(a1)              # Load number of elements from memory
+
     li t3, 0x00000000           # t3 = bit pattern of float 0.0
     fmv.w.x f0, t3              # f0 = 0.0 in float
 
@@ -38,5 +41,4 @@ relu:
 
 .section .data
 
-array_size:
-    .word 4608
+RELU_IN_ELEMENTS:    .word 4608
