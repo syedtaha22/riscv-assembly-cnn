@@ -295,5 +295,3 @@ input:
     
 output:
     .space 8*12*12*4        # Output data space: channels × height × width × 4 bytes
-NEG_INF:
-    .float -1.0e9           # Negative infinity value for initialization
