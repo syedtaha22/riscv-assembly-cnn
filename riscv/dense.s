@@ -1,104 +1,93 @@
-# ========================================
-
-# float* dense(float* input, float* weights, float* biases) {
-#     // Allocate output array
-#     float* output = (float*)malloc(D_OUT_DIM * sizeof(float));
-
-#     for (uint32_t i = 0; i < D_OUT_DIM; ++i) {
-#         float sum = biases[i];
-
-#         // Structure the inner loop for direct mapping to riscv-vector
-
-#         float input_batch[D_IN_DIM];
-#         // This maps to a vector load operation. vle32.v
-#         for (uint32_t j = 0; j < D_IN_DIM; ++j) input_batch[j] = input[j];
-
-#         float weights_batch[D_IN_DIM];
-#         // This maps to a strided load operation. vlse32.v
-#         for (uint32_t j = 0; j < D_IN_DIM; ++j) weights_batch[j] = weights[j * D_OUT_DIM + i];
-
-#         // Compute the dot product
-#         // This maps to a vector multiply and accumulate operation. vfmacc.vv
-#         for (uint32_t j = 0; j < D_IN_DIM; ++j) sum += input_batch[j] * weights_batch[j];
-
-#         // Store result
-#         // This maps to a vector store operation. vse32.v
-#         output[i] = sum;
-#     }
-#     return output;
-# }
-# ========================================
 #define STDOUT 0xd0580000
 
 .section .text
-.global _start 
-_start:
-    li x1, 0xd0580000            # Load address for output
+.global dense
 
-    # constants
-    li t0, 1152                  # t0 = D_IN_DIM
-    li t1, 10                    # t1 = D_OUT_DIM
-    li t4, 40                    # t4 = stride = D_OUT_DIM * 4
+# _start:
+#     li x1, 0xd0580000          # Optional for debug output
+#     la a0, inputs          # Input vector base address
+#     call dense             # Call dense layer
+#     # Output vector address now in a0
+#     j _finish
 
-    # vectors
-    la a1, inputs                # a1 = &input[0]
-    la a2, weights               # a2 = &weights[0]
-    la a3, biases                # a3 = &biases[0]
-    la a4, outputs               # a4 = &output[0]
+# Function: dense
+# Arguments:
+#   a0 - address of input vector
+# Returns:
+#   a0 - address of output vector
+dense:
+    addi sp, sp, -4
+    sw ra, 0(sp)
+
+    li t0, 1152                  # D_IN_DIM
+    li t1, 10                    # D_OUT_DIM
+    li t4, 40                    # D_OUT_DIM * 4 (stride in bytes)
+
+    la a2, weights               # weights pointer
+    la a3, biases                # biases pointer
+    la a4, outputs               # output buffer
+
+    li t5, 8
+    vsetvli t5, t5, e32, ta, ma
+    vmv.v.i v0, 0
 
     addi t2, zero, 0             # i = 0
     loop_i:
-        bge t2, t1, end_loop_i   # if i >= D_OUT_DIM, break
+        bge t2, t1, end_loop_i       # if i >= D_OUT_DIM, break
 
         vsetvli t3, x0, e32, ta, ma
         flw f1, 0(a3)
-        vfmv.s.f v0, f1          # Broadcast bias[i] into v0
+        vfmv.s.f v0, f1              # broadcast bias[i]
 
-        # prepare weight base pointer: &weights[0 * D_OUT_DIM + i]
-        slli s2, t2, 2           # s2 = i * 4
-        add s3, a2, s2           # s3 = weights base for this i-th output
+        slli s2, t2, 2               # i * 4
+        add s3, a2, s2               # base of weights[0][i]
 
-        dense:
+        dense_inner:
             vsetvli t5, t0, e32, ta, ma
-            sub t6, t0, t5                   # t6 = remaining inputs
-            slli s1, t5, 2                   # s1 = bytes = elements * 4
+            sub t0, t0, t5               # remaining input elements
+            slli s1, t5, 2               # vector byte length
 
-            vle32.v v1, (a1)                 # Load: v1 = input[j]
-            add a1, a1, s1                   # Increment input pointer
+            vle32.v v1, (a0)             # v1 = input[j]
+            add a0, a0, s1               # move input pointer forward
 
-            vlse32.v v2, (s3), t4            # v2 = weights[j][i] with stride
-            mul s4, t5, t4                   # t7 = vlen * stride
-            add s3, s3, s4                   # advance weights pointer
+            vlse32.v v2, (s3), t4        # v2 = weights[j][i]
+            mul s4, t5, t4
+            add s3, s3, s4               # move weights pointer forward
 
-            vfmul.vv v3, v1, v2              # Multiply input * weights
-            vfredosum.vs v0, v3, v0          # Accumulate sum into v0
+            vfmul.vv v3, v1, v2          # v3 = input * weights
+            vfredosum.vs v0, v3, v0      # v0 += sum(v3)
 
-            mv t0, t6                        # Update input count
-            bnez t0, dense                   # Loop until all inputs processed
+            bnez t0, dense_inner         # continue if not done
 
-        dense_end:
+        dense_done:
             vfmv.f.s f0, v0
-            fsw f0, 0(a4)                    # Store output[i]
-            addi a4, a4, 4                   # Advance output pointer
+            fsw f0, 0(a4)                # store result
+            addi a4, a4, 4               # move output pointer
 
-            la a1, inputs                    # Reset input pointer
-            li t0, 1152                      # Reset input count
+            la a0, inputs                # reset input
+            li t0, 1152                  # reset input size
 
-            addi a3, a3, 4                   # Advance bias pointer
-            addi t2, t2, 1                   # i++
+            addi a3, a3, 4               # next bias
+            addi t2, t2, 1               # i++
 
-            j loop_i                         # Jump to next output neuron
+            j loop_i
 
     end_loop_i:
+        la a0, outputs               # return output pointer in a0
 
-_finish:
-    li x3, 0xd0580000
-    li x5, 0xff
-    sb x5, 0(x3)
-    beq x0, x0, _finish
-.rept 100
-    nop
-.endr
+    lw ra, 0(sp)
+    addi sp, sp, 4
+    ret
+
+# _finish:
+#     li x3, 0xd0580000
+#     li x5, 0xff
+#     sb x5, 0(x3)
+#     j _finish
+
+# .rept 100
+#     nop
+# .endr
 
 .data 
 weights: 
