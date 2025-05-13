@@ -51,16 +51,16 @@ def display_floats(values, shape=None, channel_view=False):
         print()
 
 if __name__ == "__main__":
-    filename = "riscv/build/logs/softmax.txt"
-    instruction = "vle32.v v0, (a0)"  # Change to "vlse32" or "vfredmax" as needed
+    filename = "build/logs/main.txt"
+    instruction = "vle32.v v10, (a0)"  # Change to "vlse32" or "vfredmax" as needed
     
     values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredosum"))
 
     # # get the last 4608 values
     # print(len(values), "values before slicing")
-    values = values[-16:-6]
+    # values = values[-16:-6]
     # print(len(values), "values extracted")
-
+    values = values[:10]
 
     display_floats(
         values,
