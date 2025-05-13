@@ -50,12 +50,11 @@ def display_floats(values, shape=None, channel_view=False):
             print(f"{value:.3f}", end=" ")
         print()
 
-# Example usage
 if __name__ == "__main__":
     filename = "riscv/build/logs/maxpool.txt"
-    instruction = "fsw"
+    instruction = "vle32.v v0, (a1)"
     
-    values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredsum"))
+    values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredmax"))
 
     display_floats(
         values,
