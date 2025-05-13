@@ -1,149 +1,97 @@
+#define STDOUT 0xd0580000   # Initialize STDOUT
+
 .section .text
 .global _start
 _start:
     li    x1, 0xd0580000    # Initialize STDOUT
     la    a0, input         # Load input base address
     la    a1, output        # Load output base address
-    la    s8, NEG_INF       # Load negative infinity pointer
     li    t0, 24            # input width (MP_IN_DIM)
     li    t1, 2             # kernel size (MP_KERNEL_DIM)
     li    t2, 2             # stride (MP_STRIDE)
     li    t3, 12            # output width (MP_OUT_DIM)
     li    t4, 8             # number of channels (MP_OUT_CHANNELS)
+    li    s6, 2             # kernel size squared (MP_KERNEL_DIM * MP_KERNEL_DIM)
     
-    # Vector setup
-    csrr  t5, vlenb         # Get vector register length in bytes
-    srli  t5, t5, 2         # Divide by 4 to get number of 32-bit elements
-    vsetvli t6, t5, e32, m8, ta, ma  # Set vector length for 32-bit floats
-    
-    li    s0, 0             # channel index
-    
-channel_loop:
-    bge   s0, t4, _finish
+    li    s0, 0             # c = 0
+    loop_c:
+        bge   s0, t4, loop_c_end   # if c >= MP_OUT_CHANNELS, exit
         
-    # Compute per-channel input base address
-    slli  t5, t0, 2
-    mul   t6, t5, t0
-    mul   s1, s0, t6
-    add   s1, a0, s1
-    
-    # Compute per-channel output base address
-    slli  t5, t3, 2
-    mul   t6, t5, t3
-    mul   s4, s0, t6
-    add   s4, a1, s4
-    
-    li    s5, 0             # output-row index
-    
-    row_loop:  
-        bge   s5, t3, next_chan
-        
-        li    s9, 0             # output-column index
-        
-        vColumn_loop:  # Column loop (vectorized)
-            sub   t5, t3, s9        # Calculate remaining columns
-            vsetvli t6, t5, e32, m8, ta, ma  # Set vector length for this iteration
-            
-            # Initialize vector with negative infinity
-            flw   ft0, 0(s8)
-            vfmv.v.f v0, ft0
-            
-            li    s6, 0             # kernel-row index
-            
-            kRow_loop:  # Kernel row loop
-                bge   s6, t1, store_vec_results
-                li    s7, 0             # kernel-col index
-                
-                kColumn_loop:  # Kernel column loop
-                    bge   s7, t1, next_krow
-                    
-                    li    t5, 0             # Vector element counter
+        # Compute per-channel input base offset: c * MP_IN_DIM * MP_IN_DIM
+        mul s1, t0, t0
+        mul s1, s0, s1
 
-                    vector_process:  # Process each vector element for this kernel position
-                        bge   t5, t6, next_kcol
-                        
-                        # Compute input address for this vector element
-                        mul   s10, s5, t2       # i * stride
-                        add   s10, s10, s6      # i*stride + di
-                        mul   s10, s10, t0      # (i*stride + di) * input_width
-                        add   s11, s9, t5       # j + vector_element_index
-                        mul   s11, s11, t2      # (j+vec_idx) * stride
-                        add   s11, s11, s7      # (j+vec_idx)*stride + dj
-                        add   s10, s10, s11     # Full 2D index
-                        slli  s10, s10, 2       # Convert to byte offset
-                        add   s10, s1, s10      # Final input address
-                        
-                        flw   ft1, 0(s10)       # Load input value
-                        
-                        # Insert into vector at position t5
-                        vfmv.s.f v24, ft1
-                        vslideup.vi v16, v24, 0
-                        vslideup.vx v8, v16, t5
-                        
-                        addi  t5, t5, 1
-                        j     vector_process
-                        
-                    next_kcol:
-                        # Take max of current values and new values
-                        vfmax.vv v0, v0, v8
-                        
-                        addi  s7, s7, 1
-                        j     kColumn_loop
-                        
-                    next_krow:
-                        addi  s6, s6, 1
-                        j     kRow_loop
-                        
-                    store_vec_results:
-                        # Compute output address
-                        mul   t5, s5, t3
-                        add   t5, t5, s9
-                        slli  t5, t5, 2
-                        add   t5, s4, t5
-                        
-                        # Store vector result
-                        vse32.v v0, (t5)
-                        
-                        li    t5, 0             # Element counter for scalar stores
-                        
-                    store_individual:
-                        bge   t5, t6, done_storing
-                        
-                        # Compute individual element address
-                        mul   s10, s5, t3
-                        add   s10, s10, s9
-                        add   s10, s10, t5
-                        slli  s10, s10, 2
-                        add   s10, s4, s10
-                        
-                        # Store scalar value
-                        vfmv.f.s ft0, v0
-                        fsw   ft0, 0(s10)
-                        
-                        addi  t5, t5, 1
-                        vslidedown.vi v0, v0, 1  # Shift vector down for next element
-                        j    store_individual
-                        
-                    done_storing:
-                        add   s9, s9, t6        # Move to next block of columns
-                        blt   s9, t3, vColumn_loop
-                        
-                        addi  s5, s5, 1         # Next row
-                        j     row_loop
-                        
-                    next_chan:
-                        addi  s0, s0, 1         # Next channel
-                        j     channel_loop
-                        
-                    _finish:
-                        li    x3, 0xd0580000
-                        addi  x5, x0, 0xff
-                        sb    x5, 0(x3)
-                        
-                    finish_loop:
-                        beq   x0, x0, finish_loop    # Infinite loop at end
+        # Compute per-channel output base offset: c * MP_OUT_DIM * MP_OUT_DIM
+        mul s4, t3, t3
+        mul s4, s0, s4
+        
+        li    s5, 0             # i = 0
+        loop_i:  
+            bge   s5, t3, loop_i_end # if i >= MP_OUT_DIM, move to next channel
+            
+            li    s9, 0             # j = 0
+            loop_j:
+                bge   s9, t3, loop_j_end # if j >= MP_OUT_DIM, move to next row
+
+                # Set vector length for kernel size squared (MP_KERNEL_DIM * MP_KERNEL_DIM elements)
+                vsetvli s10, s6, e32, m1  # We want to process MP_KERNEL_DIM * MP_KERNEL_DIM elements
+
+                # Input base address for the current (i, j) position
+                mul    s7, s5, t0            # i * MP_IN_DIM
+                add    s7, s7, s9            # i * MP_IN_DIM + j
+                mul    s7, s7, t2            # (i * MP_IN_DIM + j) * MP_STRIDE
+                add    s7, s7, s1            # Add the input base offset
+                slli   s7, s7, 2             # Convert to byte offset
+
+                add   s7, a0, s7            # Load the input base address for the current (i, j) position
+
+                # Now load the input data from the current position and stride
+                slli   s3, t0, 2             # Convert MP_IN_DIM to byte offset
+
+                # Strided segment load to load the kernel-sized patch into vector registers
+                vlsseg2e32.v v0, (s7), s3    # Load elements into v0 with a stride of `MP_IN_DIM * 4` bytes
+                vfmax.vv v0, v0, v1
+
+                # Compute maximum within the segment using vector max
+                fmv.w.x ft0, zero            # Move integer 0 into ft0 as float 0.0
+                vfmv.s.f v1, ft0              # Move float 0.0 into all elements of v1
+                vfredmax.vs v1, v0, v1        # Perform reduction max on the vector register v0 and store in v1
+
+                # Store result back to output
+                # Compute output index : output_channel_offset + i * MP_OUT_DIM + j;
+                mul   s8, s5, t3            # i * MP_OUT_DIM
+                add   s8, s8, s9            # i * MP_OUT_DIM + j
+                add   s8, s8, s4            # Add the base address of the output image
+                slli  s8, s8, 2            # Convert to byte offset
+                add  s8, a1, s8            # Load the output base address for the current (i, j) position
+
+                # set vector lenght to 1 for storing the result
+                vse32.v v1, (s8)            # Store the result of the max pooling in the output array
+
+                addi   s9, s9, 1            # Increment j
+                j loop_j                    # Repeat for the next column
+                
+            loop_j_end:
+                addi   s5, s5, 1            # Increment i
+                j loop_i                    # Repeat for the next row
+
+        loop_i_end:
+            addi   s0, s0, 1            # Increment channel
+            j loop_c                    # Repeat for the next channel
+
+    loop_c_end:
+
+_finish:
+    li    x3, 0xd0580000       # Finish the program
+    li    x5, 0xff
+    sb    x5, 0(x3)
+    j _finish
+.rept 100
+    nop
+.endr
 
 .section .data
+.align 4
 input:
     .float 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000
     .float 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000
