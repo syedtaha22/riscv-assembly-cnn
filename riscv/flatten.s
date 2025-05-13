@@ -61,9 +61,8 @@ flatten:
 .data
 .align 4
 
-FL_IN_DIM:    .word 12
-FL_IN_CHANNELS: .word 8
+FL_IN_DIM:              .word 12
+FL_IN_CHANNELS:         .word 8
 
-# Output of flatten layer (12x12x8 = 1152 elements)
-flatten_output:
-    .space 4608                # Reserve space for flattened output
+# Output of flatten layer (12x12x8 = 1152 elements) * 4 bytes = 4608 bytes
+flatten_output:         .space 4608                # Reserve space for flattened output
