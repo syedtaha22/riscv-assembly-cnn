@@ -5,7 +5,7 @@
 # Argument:
 #   a0 - address of the input image (input image pointer)
 # Return:
-#   result pointer (s3 will hold the address of the result)
+#   result pointer (a0 will hold the address of the result)
 conv2d:
     # Load addresses for global variables
     la a1, conv_filters         # Load address of filters
@@ -108,7 +108,7 @@ conv2d:
 
     # Restore registers and return from the function
     lw ra, 0(sp)                  # Restore return address
-    lw s3, 4(sp)                  # Restore result pointer
+    lw a0, 4(sp)                  # Restore result pointer
     addi sp, sp, 16               # Restore stack pointer
     ret                           # Return from the function
 
