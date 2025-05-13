@@ -1,39 +1,10 @@
-#define STDOUT 0xd0580000
-
 .section .text
-.global _start
-_start:
-    li x0, 0xd0580000            # Load address for output
-    la a0, input_array           # Load address of input array
-    call softmax               # Call softmax function
-
-    # ==================================================================================
-    # ===================== Practically Acts like a print function =====================
-    # == Allows for easier debugging, no need to constantly change search instruction ==
-    # ==================================================================================
-    li a1, 8
-    vsetvli t0, a1, e32, ta, ma  # Set vector length based on 32-bit floats
-    vmv.v.i v0, 0                # Set all elements of v0 to 0
-    li a1, 10
-
-    load_vector:
-        vsetvli t0, a1, e32, ta, ma  # Set vector length based on 32-bit floats
-        vle32.v v0, (a0)             # Load first vector
-        
-        sub a1, a1, t0               # Decrement number of elements  
-        slli t0, t0, 2               # Multiply number of elements by 4 bytes
-        add a0, a0, t0               # Increment pointer for first vector
-        add a3, a3, t0               # Increment pointer for result
-
-        li a3, 8
-        vsetvli t0, a3, e32, ta, ma  # Set vector length based on 32-bit floats
-        vmv.v.i v0, 0                # Set all elements of v0 to 0
-
-        bnez a1, load_vector          # Loop back if not done
-    # ==================================================================================
-    
-    j _finish       
-
+.global softmax
+# Function: softmax
+# Arguments:
+#   a0 - address of the input array 
+# Returns:
+#   a0 - modifies the input array in place.
 softmax:
     # Save return address
     addi sp, sp, -8
@@ -115,16 +86,6 @@ softmax:
     lw a0, 4(sp)                # Restore input array pointer
     addi sp, sp, 8
     ret 
-
-_finish:
-    li x3, 0xd0580000
-    li x5, 0xff
-    sb x5, 0(x3)
-    j _finish
-
-.rept 100
-    nop
-.endr
 
 .section .data
 input_array:   .float -13.057146, -9.940763, 8.738958, -6.402861, -8.513822, -13.467567, -19.008825, -6.483129, -2.546416, -10.780605
