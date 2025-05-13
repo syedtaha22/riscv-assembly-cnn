@@ -10,8 +10,9 @@
 #   Applies ReLU in-place (modifies the array)
 relu:
     # Save return address
-    addi sp, sp, -4
+    addi sp, sp, -8
     sw ra, 0(sp)
+    sw a0, 4(sp)                # Save input array pointer
 
     li t3, 0x00000000           # t3 = bit pattern of float 0.0
     fmv.w.x f0, t3              # f0 = 0.0 in float
@@ -31,6 +32,7 @@ relu:
 
     # Restore return address and return
     lw ra, 0(sp)
+    lw a0, 4(sp)                # Restore input array pointer
     addi sp, sp, 4
     ret
 
