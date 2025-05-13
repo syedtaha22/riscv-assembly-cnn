@@ -51,13 +51,13 @@ def display_floats(values, shape=None, channel_view=False):
         print()
 
 if __name__ == "__main__":
-    filename = "riscv/build/logs/main.txt"
-    instruction = "vfmax"
+    filename = "riscv/build/logs/flatten.txt"
+    instruction = "vlse32"
     
     values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredsum"))
 
     display_floats(
         values,
-        shape=(8, 24, 24),              # e.g., (8, 24, 24) if reshaping
-        channel_view=True       # Set True if using (C, H, W)
+        shape=None,              # e.g., (8, 24, 24) if reshaping
+        channel_view=False       # Set True if using (C, H, W)
     )
