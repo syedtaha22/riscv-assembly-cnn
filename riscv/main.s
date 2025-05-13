@@ -3,10 +3,10 @@
 .section .text
 .global _start
 
-.extern conv2d   # Function to perform 2D convolution
-.extern relu      # Function to perform ReLU activation
-
-.extern flatten   # Function to flatten the input
+.extern conv2d      # Function to perform 2D convolution
+.extern relu        # Function to perform ReLU activation
+.extern maxpool     # Function to perform max pooling
+.extern flatten     # Function to flatten the input
 
 # Main function
 _start:
@@ -20,6 +20,8 @@ _start:
     addi a0, s3, 0               # Load address of the result (output of conv2d)
     li a1, 4608                  # Number of elements in the input image
     call relu                    # Call relu function
+
+    call maxpool                 # Call maxpool function on input a0, output is saved back to a0
     
 
     j _finish                     # Jump to _finish
