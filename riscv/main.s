@@ -59,34 +59,6 @@ _finish:
 .data 
 .align 4
 
-
-# Conv2d parameters
-CL_IN_DIM:          .word   28     # Dimension of the input image
-CL_OUT_DIM:         .word   24     # Dimension of the output feature map
-CL_IN_CHANNELS:     .word    1     # Number of input channels (e.g., grayscale image has 1 channel)
-CL_NUM_FILTERS:     .word    8     # Number of filters (output channels)
-CL_FILTER_DIM:      .word    5     # Dimension of the filter (kernel size)
-CL_STRIDE:          .word    1     # Stride of the convolution operation
-
-# MP_IN_DIM:          .word   24     // Dimension of the input feature map
-# MP_OUT_DIM:         .word   12     // Dimension of the output feature map
-# MP_IN_CHANNELS:     .word    8     // Number of input channels
-# MP_OUT_CHANNELS:    .word    8     // Number of output channels
-# MP_KERNEL_DIM:      .word    2     // Dimension of the pooling kernel
-# MP_STRIDE:          .word    2     // Stride of the pooling operation
-
-# // Flatten parameters
-# #define FL_IN_DIM        12     // Dimension of the input feature map
-# #define FL_OUT_DIM       1152   // Dimension of the output feature map. 12 * 12 * 8
-# #define FL_IN_CHANNELS   8      // Number of input channels
-# #define FL_OUT_CHANNELS  1      // Number of output channels
-
-# // Dense parameters
-# #define D_IN_DIM         1152   // Dimension of the input feature map (flattened)
-# #define D_OUT_DIM        10     // Dimension of the output (number of classes)
-
-
-
 input_image:
 .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
 .float 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
