@@ -24,6 +24,11 @@ _start:
     call dense                   # Call dense function on input a0, output is saved back to a0
     call softmax                 # Call softmax function on input a0, output is saved back to a0
 
+
+    # ==================================================================================
+    # ===================== Practically Acts like a print function =====================
+    # == Allows for easier debugging, no need to constantly change search instruction ==
+    # ==================================================================================
     li a1, 8
     vsetvli t0, a1, e32, ta, ma  # Set vector length based on 32-bit floats
     vmv.v.i v0, 0                # Set all elements of v0 to 0
@@ -43,6 +48,8 @@ _start:
         vmv.v.i v0, 0                # Set all elements of v0 to 0
 
         bnez a1, load_vector          # Loop back if not done
+    # ==================================================================================
+    
     
     j _finish                     # Jump to _finish
 
