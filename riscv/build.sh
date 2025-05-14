@@ -17,6 +17,7 @@ show_help() {
     echo "  -c         Clean generated files"
     echo "  -e         Execute the last compiled binary"
     echo "  -h         Show this help message"
+    echo "  -l <file>  Link additional assembly files"
     echo
     echo "Example:"
     echo "  $0 -a main.s -l conv2d.s -l dense.s"
