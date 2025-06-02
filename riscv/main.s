@@ -24,14 +24,10 @@ _start:
     call dense                   # Call dense function on input a0, output is saved back to a0
     call softmax                 # Call softmax function on input a0, output is saved back to a0
 
-
     # ==================================================================================
     # ===================== Practically Acts like a print function =====================
     # == Allows for easier debugging, no need to constantly change search instruction ==
     # ==================================================================================
-    li a1, 8
-    vsetvli t0, a1, e32, ta, ma  # Set vector length based on 32-bit floats
-    vmv.v.i v0, 0                # Set all elements of v0 to 0
     li a1, 10
 
     load_vector:
@@ -42,10 +38,6 @@ _start:
         slli t0, t0, 2               # Multiply number of elements by 4 bytes
         add a0, a0, t0               # Increment pointer for first vector
         add a3, a3, t0               # Increment pointer for result
-
-        li a3, 8
-        vsetvli t0, a3, e32, ta, ma  # Set vector length based on 32-bit floats
-        vmv.v.i v0, 0                # Set all elements of v0 to 0
 
         bnez a1, load_vector          # Loop back if not done
     # ==================================================================================
