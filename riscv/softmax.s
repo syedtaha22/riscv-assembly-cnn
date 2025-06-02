@@ -16,9 +16,8 @@ softmax:
 
     # Initialize accumulator for sum
     addi t0, zero, 1
-    vsetvli t0, t0, e32, ta, ma       # Set vector config, VL into t0
-    fcvt.s.w f0, zero                   # f0 = float(0)
-    vfmv.v.f v4, f0                     # v3 = broadcast 0.0
+    vsetvli t0, t0, e32, ta, ma     # Set vector config, VL into t0
+    vmv.v.i v4, 0                   # v4 = 0.0
 
     exponentiation:
         vsetvli t0, a1, e32, ta, ma         # Set vector config, VL into t0
@@ -48,7 +47,7 @@ softmax:
             addi t1, t1, 1              # i++
             j exp_loop
         exp_done:
-            vmv.v.v v0, v1              # v0 = exp(x)
+            vmv.v.v v0, v1               # v0 = exp(x)
 
             vse32.v v0, (a0)            # Store exp(x) back to input[]
             add a0, a0, t0              # Increment pointer for input
