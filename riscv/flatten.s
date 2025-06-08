@@ -33,10 +33,18 @@ flatten:
             mul t6, t4, t0                 # t6 = i * FL_IN_DIM
             add t6, t6, t5                 # t6 = i * W + j
 
+            ######## TODO: Take this out of the loop ########
             slli s2, t2, 2                 # stride in bytes between channels = 144 * 4
+            #####################################################
+
             vsetvli s3, t1, e32            # VL = channels, e32
+
+            ######## TODO: Use t6 instead of s4 ########
             slli s4, t6, 2                 # offset in bytes
             add s5, a0, s4                 # input + offset
+            #####################################################
+
+
             vlse32.v v0, (s5), s2          # load strided values into v0
 
             slli s6, t3, 2                 # output offset = flat_index * 4
