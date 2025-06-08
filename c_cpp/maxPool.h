@@ -60,6 +60,13 @@ float* maxPool(float* input) {
                 // vlsseg2e32.v
                 float input_batch[MP_KERNEL_DIM * MP_KERNEL_DIM];
 
+                /* For clarity,
+                 *    (i * MP_STRIDE + di) * MP_IN_DIM + (j * MP_STRIDE + dj)
+                 *
+                 * di, dj resolves to 0 for the first element
+                 * => (i * MP_STRIDE) * MP_IN_DIM + (j * MP_STRIDE)
+                 * => (i * MP_IN_DIM + j) * MP_STRIDE               By taking common factor
+                 */
                 for (uint32_t di = 0; di < MP_KERNEL_DIM; ++di) {
                     for (uint32_t dj = 0; dj < MP_KERNEL_DIM; ++dj) {
                         input_batch[di * MP_KERNEL_DIM + dj] = input[input_channel_offset + (i * MP_STRIDE + di) * MP_IN_DIM + (j * MP_STRIDE + dj)];
