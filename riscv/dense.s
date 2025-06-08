@@ -1,14 +1,8 @@
-#define STDOUT 0xd0580000
+# TODO: Fix weight storing format, to reduce instructions.
+
 
 .section .text
 .global dense
-
-# _start:
-#     li x1, 0xd0580000          # Optional for debug output
-#     la a0, inputs          # Input vector base address
-#     call dense             # Call dense layer
-#     # Output vector address now in a0
-#     j _finish
 
 # Function: dense
 # Arguments:
@@ -20,6 +14,8 @@ dense:
     sw ra, 0(sp)
     sw a0, 4(sp)                # Save input vector pointer
 
+
+    # TODO: Define these in .data section
     li t0, 1152                  # D_IN_DIM
     li t1, 10                    # D_OUT_DIM
     li t4, 40                    # D_OUT_DIM * 4 (stride in bytes)
@@ -28,6 +24,7 @@ dense:
     la a3, biases                # biases pointer
     la a4, outputs               # output buffer
 
+    ## TODO: See if this can be omitted
     li t5, 8
     vsetvli t5, t5, e32, ta, ma
     vmv.v.i v0, 0
@@ -37,7 +34,7 @@ dense:
         bge t2, t1, end_loop_i       # if i >= D_OUT_DIM, break
 
         vsetvli t3, x0, e32, ta, ma
-        flw f1, 0(a3)
+        flw f1, 0(a3)  
         vfmv.s.f v0, f1              # broadcast bias[i]
 
         slli s2, t2, 2               # i * 4
@@ -65,7 +62,10 @@ dense:
             fsw f0, 0(a4)                # store result
             addi a4, a4, 4               # move output pointer
 
+            # TODO: Use a different temp register for dense_inner input pointer. Would reduce this instruction.
             lw a0, 4(sp)                 # restore input vector pointer
+
+            # TODO: Generalise this.
             li t0, 1152                  # reset input size
 
             addi a3, a3, 4               # next bias
@@ -79,16 +79,6 @@ dense:
     lw ra, 0(sp)
     addi sp, sp, 8
     ret
-
-# _finish:
-#     li x3, 0xd0580000
-#     li x5, 0xff
-#     sb x5, 0(x3)
-#     j _finish
-
-# .rept 100
-#     nop
-# .endr
 
 .data 
 weights: 
@@ -107,4 +97,3 @@ weights:
 biases: .float 0.070946, 0.186120, 0.042093, -0.199637, -0.036333, 0.089625, 0.037977, 0.074483, -0.141996, -0.030494
 
 outputs: .space 40
-#Expected Values: -13.057146, -9.940763, 8.738958, -6.402861, -8.513822, -13.467567, -19.008825, -6.483129, -2.546416, -10.780605
