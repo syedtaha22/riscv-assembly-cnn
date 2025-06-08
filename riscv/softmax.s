@@ -32,9 +32,9 @@ softmax:
         vfmv.v.f v1, f0                 # v1 = broadcast 1.0
         vfmv.v.f v2, f0                 # v2 = term vector
 
-        li t1, 1                     # i = 1
         li t2, 1000                  # terms = 1000
 
+        li t1, 1                     # i = 1
         exp_loop:
             bge t1, t2, exp_done        # while (i < 1000)
 
@@ -67,9 +67,10 @@ softmax:
     # Normalize the exponentials
     normalize:
         vsetvli t0, a1, e32, ta, ma     # Set vector config, VL into t0
-        vfmv.v.f v1, f0                 # v1 = broadcast(sum)
         sub a1, a1, t0                  # Decrement number of elements
         slli t0, t0, 2                  # Multiply number of elements by 4 bytes
+        
+        vfmv.v.f v1, f0                 # v1 = broadcast(sum)
 
         vle32.v v0, (a0)                # Load input[] into v0 (x)
         vfdiv.vv v0, v0, v1             # v0 = exp(x) / sum(exp(x))
@@ -87,6 +88,5 @@ softmax:
     ret 
 
 .section .data
-input_array:   .float -13.057146, -9.940763, 8.738958, -6.402861, -8.513822, -13.467567, -19.008825, -6.483129, -2.546416, -10.780605
 
 array_size:    .word 10
