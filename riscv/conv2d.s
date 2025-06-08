@@ -62,7 +62,7 @@ conv2d:
                     vle32.v v1, 0(t5)      # input patch row
 
                     # filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM
-                    # filter_row = (k * CL_FILTER_DIM + fi) * CL_FILTER_DIM                 (take CL_)
+                    # filter_row = (k * CL_FILTER_DIM + fi) * CL_FILTER_DIM                 (take CL_FILTER_DIM common)
                     mul t6, t1, a6         # k * FD
                     add t6, t6, t4         # + fi
                     mul t6, t6, a6         # * FD
@@ -83,11 +83,12 @@ conv2d:
                     # Sum reduction
                     vsetvli t0, a6, e32, m1
                     
-                    # Calculate bias index: bias addess + k
+                    # Calculate bias index: bias address + k
                     slli t6, t1, 2            # byte offset = *4
                     add t6, a2, t6           # &bias[k]
                     lw t6, 0(t6)             # Load bias value
 
+                    # TODO: Why is this a integer? Make it float
                     vmv.s.x v3, t6           # Initialize v3 with bias
                     vfredsum.vs v3, v0, v3
 
