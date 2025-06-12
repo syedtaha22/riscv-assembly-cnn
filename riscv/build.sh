@@ -61,15 +61,21 @@ compile() {
     exe="${BUILD_DIR}/exe/${base}.exe"
     hex="${BUILD_DIR}/hex/${base}.hex"
     dis="${BUILD_DIR}/dis/${base}.dis"
+    data="${BUILD_DIR}/dis/${base}.data"
 
     echo "[*] Compiling files: ${input_files[*]} ..."
 
     # Compile and link all the files together
     $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "${input_files[@]}" -nostartfiles -lm
+
+    # Generate output formats
     $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
     $GCC_PREFIX-objdump -S "$exe" > "$dis"
-    echo "[+] Output: $exe, $hex, $dis"
+    $GCC_PREFIX-objdump -s -j .data "$exe" > "$data"
+
+    echo "[+] Output: $exe, $hex, $dis, $data"
 }
+
 
 execute() {
     input_file="$1"
