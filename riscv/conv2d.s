@@ -43,7 +43,7 @@ conv2d:
                 bge t3, a4, loop_j_end   # if j >= CL_OUT_DIM, exit
 
                 vsetvli t0, a6, e32, m1  # vector length = FILTER_DIM
-                vmv.v.x v0, x0       # Set all elements of v0 to zero
+                vmv.v.x v5, x0       # Set all elements of v5 to zero
 
                 li t4, 0                 # fi = 0
                 conv_row:
@@ -75,7 +75,7 @@ conv2d:
                     vle32.v v2, 0(t6)         # filter row
 
                     # Accumulate dot product
-                    vfmacc.vv v0, v1, v2
+                    vfmacc.vv v5, v1, v2
 
                     addi t4, t4, 1           # fi++
                     j conv_row
@@ -90,7 +90,7 @@ conv2d:
 
                     # TODO: Why is this a integer? Make it float
                     vmv.s.x v3, t6           # Initialize v3 with bias
-                    vfredsum.vs v3, v0, v3
+                    vfredsum.vs v3, v5, v3
 
                     # Store result
                     vmv.x.s t0, v3         # Extract scalar from v3[0]

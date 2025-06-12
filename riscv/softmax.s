@@ -24,7 +24,7 @@ softmax:
         sub a1, a1, t0                      # Decrement number of elements
         slli t0, t0, 2                      # Multiply number of elements by 4 bytes
 
-        vle32.v v0, (a0)                   # Load input[] into v0 (x)
+        vle32.v v5, (a0)                   # Load input[] into v5 (x)
 
         # --- Taylor series: result = 1.0, term = 1.0 ---
         addi t3, zero, 1                # t0 = 1
@@ -38,7 +38,7 @@ softmax:
         exp_loop:
             bge t1, t2, exp_done        # while (i < 1000)
 
-            vfmul.vv v2, v2, v0         # term *= x
+            vfmul.vv v2, v2, v5         # term *= x
             fcvt.s.w f0, t1             # f0 = (float)i
             vfmv.v.f v3, f0             # v3 = float(i) broadcast
             vfdiv.vv v2, v2, v3         # term /= i!
@@ -47,12 +47,12 @@ softmax:
             addi t1, t1, 1              # i++
             j exp_loop
         exp_done:
-            vmv.v.v v0, v1               # v0 = exp(x)
+            vmv.v.v v5, v1               # v5 = exp(x)
 
-            vse32.v v0, (a0)            # Store exp(x) back to input[]
+            vse32.v v5, (a0)            # Store exp(x) back to input[]
             add a0, a0, t0              # Increment pointer for input
 
-            vfredosum.vs v4, v0, v4     # v4[0] = sum(exp(x))
+            vfredosum.vs v4, v5, v4     # v4[0] = sum(exp(x))
             
             bnez a1, exponentiation     # if (a1 != 0 i.e more elements) continue
     exponentiation_done:
@@ -72,11 +72,11 @@ softmax:
         
         vfmv.v.f v1, f0                 # v1 = broadcast(sum)
 
-        vle32.v v0, (a0)                # Load input[] into v0 (x)
-        vfdiv.vv v0, v0, v1             # v0 = exp(x) / sum(exp(x))
+        vle32.v v5, (a0)                # Load input[] into v5 (x)
+        vfdiv.vv v5, v5, v1             # v5 = exp(x) / sum(exp(x))
 
         # Store back result
-        vse32.v v0, (a0)
+        vse32.v v5, (a0)
         add a0, a0, t0                  # Increment pointer for input
 
         bnez a1, normalize              # if (a1 != 0 i.e more elements) continue

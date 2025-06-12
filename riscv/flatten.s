@@ -45,11 +45,11 @@ flatten:
             #####################################################
 
 
-            vlse32.v v0, (s5), s2          # load strided values into v0
+            vlse32.v v5, (s5), s2          # load strided values into v5
 
             slli s6, t3, 2                 # output offset = flat_index * 4
             add s7, a1, s6                 # output address
-            vse32.v v0, (s7)               # store result
+            vse32.v v5, (s7)               # store result
 
             add t3, t3, t1                 # flat_index += channels
             addi t5, t5, 1

@@ -25,8 +25,8 @@ relu:
         vle32.v v1, (a0)            # Load input
         sub a1, a1, t0              # Decrease remaining count
 
-        vfmv.v.f v0, f0             # v0 = 0.0
-        vfmax.vv v2, v1, v0         # v2 = max(v1, 0.0)
+        vfmv.v.f v5, f0             # v5 = 0.0
+        vfmax.vv v2, v1, v5         # v2 = max(v1, 0.0)
         vse32.v v2, (a0)            # Store result back
 
         slli t0, t0, 2              # Convert elements to bytes

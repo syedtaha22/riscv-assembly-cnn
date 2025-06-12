@@ -27,7 +27,7 @@ dense:
     ## TODO: See if this can be omitted
     li t5, 8
     vsetvli t5, t5, e32, ta, ma
-    vmv.v.i v0, 0
+    vmv.v.i v5, 0
 
     addi t2, zero, 0             # i = 0
     loop_i:
@@ -35,7 +35,7 @@ dense:
 
         vsetvli t3, x0, e32, ta, ma
         flw f1, 0(a3)  
-        vfmv.s.f v0, f1              # broadcast bias[i]
+        vfmv.s.f v5, f1              # broadcast bias[i]
 
         slli s2, t2, 2               # i * 4
         add s3, a2, s2               # base of weights[0][i]
@@ -53,12 +53,12 @@ dense:
             add s3, s3, s4               # move weights pointer forward
 
             vfmul.vv v3, v1, v2          # v3 = input * weights
-            vfredosum.vs v0, v3, v0      # v0 += sum(v3)
+            vfredosum.vs v5, v3, v5      # v5 += sum(v3)
 
             bnez t0, dense_inner         # continue if not done
 
         dense_done:
-            vfmv.f.s f0, v0
+            vfmv.f.s f0, v5
             fsw f0, 0(a4)                # store result
             addi a4, a4, 4               # move output pointer
 

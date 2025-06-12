@@ -53,13 +53,14 @@ maxpool:
                 slli s7, s7, 2              # Convert to byte offset
                 add s7, a0, s7              # final input address
 
+                # TODO: This will give us a lot of pain later.
                 slli s3, t0, 2              # MP_IN_DIM * 4 (byte stride)
-                vlsseg2e32.v v0, (s7), s3   # Load 2 rows of kernel into v0
-                vfmax.vv v0, v0, v1         # Take the maximum from the two loaded vectors
+                vlsseg2e32.v v5, (s7), s3   # Load 2 rows of kernel into v5
+                vfmax.vv v5, v5, v6         # Take the maximum from the two loaded vectors
 
                 fmv.w.x ft0, zero           # Set ft0 to zero
-                vfmv.s.f v1, ft0            # Set v1 to zero
-                vfredmax.vs v1, v0, v1      # Reduce max
+                vfmv.s.f v6, ft0            # Set v6 to zero
+                vfredmax.vs v6, v5, v6      # Reduce max
 
                 # Compute output address
                 mul s8, s5, t3              # i * MP_OUT_DIM
@@ -68,7 +69,7 @@ maxpool:
                 slli s8, s8, 2              # Convert to byte offset
                 add s8, a1, s8              # final output address
 
-                vse32.v v1, (s8)            # Store result 
+                vse32.v v6, (s8)            # Store result 
 
                 addi s9, s9, 1              # Increment j
                 j loop_j                    # Repeat for the next column
