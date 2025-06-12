@@ -18,8 +18,6 @@
  * The output is a dynamically allocated 1D array of size FL_OUT_DIM. It is the caller's
  * responsibility to deallocate the returned memory to avoid memory leaks.
  *
- * Optimized and structured for direct mapping to riscv-vector. Although uses an extra loop
- * in c/cpp terms, those loops can be reduced to single instructons
  *
  * @param input Pointer to the flattened input data array (FL_IN_CHANNELS × FL_IN_DIM × FL_IN_DIM).
  * @return Pointer to the dynamically allocated 1D output array (FL_OUT_DIM).
@@ -28,22 +26,21 @@
  *       followed by channels, producing an output suitable for fully connected layers.
  */
 float* flatten(float* input) {
-    // Allocate output array
     float* output = (float*)malloc(FL_OUT_DIM * sizeof(float));
     uint32_t index = 0;
+    uint32_t spatial_size = FL_IN_DIM * FL_IN_DIM;
+
     for (uint32_t i = 0; i < FL_IN_DIM; ++i) {
         for (uint32_t j = 0; j < FL_IN_DIM; ++j) {
-            // Vectorise the inner loop
-            float input_patch[8];
             uint32_t input_patch_index = i * FL_IN_DIM + j;
 
-            // Structured for direct mapping to riscv-v. Can use one vlse32.v (strided vector load)
-            for (uint32_t c = 0; c < FL_IN_CHANNELS; ++c) input_patch[c] = input[c * (FL_IN_DIM * FL_IN_DIM) + input_patch_index];
-
-            // Can be saved directly with on single riscv-v instruction. vse32.v
-            for (uint32_t c = 0; c < FL_IN_CHANNELS; ++c) output[index++] = input_patch[c];
+            // Unroll loop over channels for efficiency
+            for (uint32_t c = 0; c < FL_IN_CHANNELS; ++c) {
+                output[index++] = input[c * spatial_size + input_patch_index];
+            }
         }
     }
+
     return output;
 }
 

@@ -30,30 +30,18 @@
  *       weight vector, followed by the addition of a bias term.
  */
 float* dense(float* input, float* weights, float* biases) {
-    // Allocate output array
     float* output = (float*)malloc(D_OUT_DIM * sizeof(float));
 
     for (uint32_t i = 0; i < D_OUT_DIM; ++i) {
         float sum = biases[i];
-        // Structure the inner loop for direct mapping to riscv-vector
-
-        float input_batch[D_IN_DIM];
-        // This maps to a vector load operation. vle32.v
-        for (uint32_t j = 0; j < D_IN_DIM; ++j) input_batch[j] = input[j];
-
-        float weights_batch[D_IN_DIM];
-        // This maps to a strided load operation. vlse32.v
-        for (uint32_t j = 0; j < D_IN_DIM; ++j) weights_batch[j] = weights[j * D_OUT_DIM + i];
-
-        // Compute the dot product
-        // This maps to a vector multiply and accumulate operation. vfmacc.vv
-        for (uint32_t j = 0; j < D_IN_DIM; ++j) sum += input_batch[j] * weights_batch[j];
-
-        // Store result
-        // This maps to a vector store operation. vse32.v
+        for (uint32_t j = 0; j < D_IN_DIM; ++j) {
+            sum += input[j] * weights[j * D_OUT_DIM + i];
+        }
         output[i] = sum;
     }
+
     return output;
 }
+
 
 #endif // DENSE_H
