@@ -4,10 +4,10 @@
 
 #include <stdio.h>
 
-#include "flatten.h"
 #include "conv2d.h"
-#include "maxPool.h"
 #include "activation.h"
+#include "maxPool.h"
+#include "flatten.h"
 #include "dense.h"
 
 #include "utils.h"
@@ -45,7 +45,7 @@ float input_data[CL_IN_DIM * CL_IN_DIM * CL_IN_CHANNELS] =
 };
 
 
-int main() {
+void main() {
 
     conv2d(input_data);
     ReLU(conv_out, CL_OUT_DIM * CL_OUT_DIM * CL_NUM_FILTERS); // Apply ReLU activation
@@ -58,5 +58,5 @@ int main() {
 
     printf("Predicted label: %d\n", predicted_label);
 
-    return 0;
+    // return 0;
 }
