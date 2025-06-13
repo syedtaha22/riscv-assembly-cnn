@@ -2,25 +2,28 @@
 
 # ================= Configuration =================
 GCC_PREFIX="riscv32-unknown-elf"
-ABI="-march=rv32gcv -mabi=ilp32d"
+ABI="-march=rv32gcv -mabi=ilp32f"
 LINK="veer/link.ld"
 WHISPER_CFG="veer/whisper.json"
 BUILD_DIR="build"
-OUT_DIRS=("exe" "hex" "dis" "logs")
+OUT_DIRS=("exe" "hex" "dis" "logs" "asm" "obj")
+DEFAULT_OPT=""
 # =================================================
 
 show_help() {
-    echo "Usage: $0 [options] <file.s> [<file.s> ...]"
+    echo "Usage: $0 [options] <file> [<file> ...]"
     echo
     echo "Options:"
-    echo "  -a         Compile and execute"
-    echo "  -c         Clean generated files"
-    echo "  -e         Execute the last compiled binary"
-    echo "  -h         Show this help message"
-    echo "  -l <file>  Link additional assembly files"
+    echo "  -a             Compile and execute assembly (.s) files"
+    echo "  -c             Clean generated files"
+    echo "  -e             Execute the last compiled binary"
+    echo "  -g [opt_flag]  Compile C (.c) to assembly/object/hex with optional -O2/-O3"
+    echo "  -h             Show this help message"
+    echo "  -l <file>      Link additional assembly files"
     echo
-    echo "Example:"
-    echo "  $0 -a main.s -l conv2d.s -l dense.s"
+    echo "Examples:"
+    echo "  $0 -a main.s -l conv2d.s"
+    echo "  $0 -g -O3 main.c"
 }
 
 make_dirs() {
@@ -31,51 +34,73 @@ make_dirs() {
 
 get_basename() {
     filename="$1"
-    echo "$(basename "$filename" .s)"
+    echo "$(basename "$filename" .s | sed 's/\.c$//')"
 }
 
-compile() {
+compile_asm() {
     input_files=()
-    # Extract files and add to the source files list
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -l)
                 shift
-                input_files+=("$1")  # Add the file after -l to the source files
+                input_files+=("$1")
                 ;;
             *)
-                input_files+=("$1")  # Add the file to the source files
+                input_files+=("$1")
                 ;;
         esac
         shift
     done
 
-    # Check if at least one file is provided
     if [[ ${#input_files[@]} -eq 0 ]]; then
         echo "Error: No files provided to compile."
         exit 1
     fi
 
-    # Create file names based on input files
     base=$(get_basename "${input_files[0]}")
     exe="${BUILD_DIR}/exe/${base}.exe"
     hex="${BUILD_DIR}/hex/${base}.hex"
     dis="${BUILD_DIR}/dis/${base}.dis"
     data="${BUILD_DIR}/dis/${base}.data"
+    linked_asm="${BUILD_DIR}/asm/${base}.s"
 
-    echo "[*] Compiling files: ${input_files[*]} ..."
-
-    # Compile and link all the files together
+    echo "[*] Compiling assembly: ${input_files[*]} ..."
     $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "${input_files[@]}" -nostartfiles -lm
 
-    # Generate output formats
     $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
     $GCC_PREFIX-objdump -S "$exe" > "$dis"
     $GCC_PREFIX-objdump -s -j .data "$exe" > "$data"
+    $GCC_PREFIX-objdump -d -M no-aliases "$exe" > "$linked_asm"
 
-    echo "[+] Output: $exe, $hex, $dis, $data"
+    echo "[+] Output: $exe, $hex, $dis, $data, $linked_asm"
 }
 
+compile_c() {
+    opt_flag="$1"
+    shift
+    input_file="$1"
+
+    if [[ ! -f "$input_file" ]]; then
+        echo "Error: C file $input_file not found."
+        exit 1
+    fi
+
+    base=$(get_basename "$input_file")
+    asm="${BUILD_DIR}/asm/${base}${opt_flag}.s"
+    obj="${BUILD_DIR}/obj/${base}${opt_flag}.o"
+
+    echo "[*] Compiling C file: $input_file with ${opt_flag:-no optimization} ..."
+    
+    if [[ -n "$opt_flag" ]]; then
+        $GCC_PREFIX-gcc $ABI "$opt_flag" -S "$input_file" -o "$asm"
+        $GCC_PREFIX-gcc $ABI "$opt_flag" -c "$input_file" -o "$obj"
+    else
+        $GCC_PREFIX-gcc $ABI -S "$input_file" -o "$asm"
+        $GCC_PREFIX-gcc $ABI -c "$input_file" -o "$obj"
+    fi
+
+    echo "[+] Output: $asm, $obj"
+}
 
 execute() {
     input_file="$1"
@@ -112,11 +137,20 @@ fi
 
 ACTION=""
 
-while getopts "aceh" opt; do
+while getopts "acehg::" opt; do
     case $opt in
         a) ACTION="all" ;;
         c) ACTION="clean" ;;
         e) ACTION="exec" ;;
+        g)
+            ACTION="compile_c"
+            if [[ "$OPTARG" == -O* ]]; then
+                OPT_FLAG="$OPTARG"
+            else
+                OPT_FLAG="$DEFAULT_OPT"
+                [[ -n "$OPTARG" ]] && set -- "$OPTARG" "$@"
+            fi
+            ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
     esac
@@ -127,24 +161,20 @@ make_dirs
 
 case "$ACTION" in
     all)
-        if [[ $# -lt 1 ]]; then
-            echo "Error: Please provide at least one .s file."
-            show_help
-            exit 1
-        fi
-        compile "$@"
+        [[ $# -lt 1 ]] && { echo "Error: Please provide at least one .s file."; show_help; exit 1; }
+        compile_asm "$@"
         execute "$1"
         ;;
     clean)
         clean
         ;;
     exec)
-        if [[ $# -lt 1 ]]; then
-            echo "Error: Please provide a .s file for execution."
-            show_help
-            exit 1
-        fi
+        [[ $# -lt 1 ]] && { echo "Error: Please provide a .s file."; show_help; exit 1; }
         execute "$1"
+        ;;
+    compile_c)
+        [[ $# -lt 1 ]] && { echo "Error: Please provide a .c file."; show_help; exit 1; }
+        compile_c "$OPT_FLAG" "$1"
         ;;
     *)
         show_help
