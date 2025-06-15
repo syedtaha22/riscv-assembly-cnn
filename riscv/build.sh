@@ -2,7 +2,7 @@
 
 # ================= Configuration =================
 GCC_PREFIX="riscv32-unknown-elf"
-ABI="-march=rv32gcv -mabi=ilp32f"
+ABI="-march=rv32imfcv -mabi=ilp32f"
 LINK="veer/link.ld"
 WHISPER_CFG="veer/whisper.json"
 BUILD_DIR="build"
@@ -24,6 +24,7 @@ show_help() {
     echo "Examples:"
     echo "  $0 -a main.s -l conv2d.s"
     echo "  $0 -g -O3 main.c"
+    echo "  $0 -a main.s -l conv2d.s -l relu.s -l maxpool.s -l flatten.s -l dense.s -l softmax.s"
 }
 
 make_dirs() {
@@ -62,17 +63,13 @@ compile_asm() {
     hex="${BUILD_DIR}/hex/${base}.hex"
     dis="${BUILD_DIR}/dis/${base}.dis"
     data="${BUILD_DIR}/dis/${base}.data"
-    linked_asm="${BUILD_DIR}/asm/${base}.s"
 
     echo "[*] Compiling assembly: ${input_files[*]} ..."
     $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "${input_files[@]}" -nostartfiles -lm
-
     $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
     $GCC_PREFIX-objdump -S "$exe" > "$dis"
     $GCC_PREFIX-objdump -s -j .data "$exe" > "$data"
-    $GCC_PREFIX-objdump -d -M no-aliases "$exe" > "$linked_asm"
-
-    echo "[+] Output: $exe, $hex, $dis, $data, $linked_asm"
+    echo "[+] Output: $exe, $hex, $dis, $data"
 }
 
 compile_c() {
@@ -85,9 +82,19 @@ compile_c() {
         exit 1
     fi
 
+    if [[ ! -f "start.s" ]]; then
+        echo "Error: start.s not found in current directory."
+        exit 1
+    fi
+
     base=$(get_basename "$input_file")
     asm="${BUILD_DIR}/asm/${base}${opt_flag}.s"
     obj="${BUILD_DIR}/obj/${base}${opt_flag}.o"
+    exe="${BUILD_DIR}/exe/${base}${opt_flag}.exe"
+    hex="${BUILD_DIR}/hex/${base}${opt_flag}.hex"
+    dis="${BUILD_DIR}/dis/${base}${opt_flag}.dis"
+    data="${BUILD_DIR}/dis/${base}${opt_flag}.data"
+    log="${BUILD_DIR}/logs/${base}${opt_flag}.txt"
 
     echo "[*] Compiling C file: $input_file with ${opt_flag:-no optimization} ..."
     
@@ -99,7 +106,22 @@ compile_c() {
         $GCC_PREFIX-gcc $ABI -c "$input_file" -o "$obj"
     fi
 
-    echo "[+] Output: $asm, $obj"
+    start_obj="${BUILD_DIR}/obj/start.o"
+    $GCC_PREFIX-as $ABI -o "$start_obj" start.s
+
+    echo "[*] Linking with start.o ..."
+    $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "$start_obj" "$obj" -nostartfiles -lm
+
+    echo "[*] Generating hex and disassembly ..."
+    $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
+    $GCC_PREFIX-objdump -S "$exe" > "$dis"
+    $GCC_PREFIX-objdump -s -j .data "$exe" > "$data"
+
+    echo "[*] Executing with whisper ..."
+    whisper -x "$hex" -s 0x80000000 --tohost 0xd0580000 -f "$log" --configfile "$WHISPER_CFG"
+
+    echo "[+] Output: $asm, $obj, $exe, $hex, $dis, $data"
+    echo "[+] Execution log saved to $log"
 }
 
 execute() {
