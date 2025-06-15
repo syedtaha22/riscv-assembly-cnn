@@ -68,3 +68,5 @@ if __name__ == "__main__":
         shape=None,
         channel_view=False       # Set True if using (C, H, W)
     )
+
+    print("\nModel prediction:", np.argmax(values))
