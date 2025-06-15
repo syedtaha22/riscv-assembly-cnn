@@ -2,7 +2,7 @@
 
 # ================= Configuration =================
 GCC_PREFIX="riscv32-unknown-elf"
-ABI="-march=rv32gcv -mabi=ilp32f"
+ABI="-march=rv32imfcv -mabi=ilp32"  # Changed to ilp32 so that O3 optimizations are supported by whisper
 LINK="veer/link.ld"
 WHISPER_CFG="veer/whisper.json"
 BUILD_DIR="build"
@@ -81,9 +81,19 @@ compile_c() {
         exit 1
     fi
 
+    if [[ ! -f "start.s" ]]; then
+        echo "Error: start.s not found in current directory."
+        exit 1
+    fi
+
     base=$(get_basename "$input_file")
     asm="${BUILD_DIR}/asm/${base}${opt_flag}.s"
     obj="${BUILD_DIR}/obj/${base}${opt_flag}.o"
+    exe="${BUILD_DIR}/exe/${base}${opt_flag}.exe"
+    hex="${BUILD_DIR}/hex/${base}${opt_flag}.hex"
+    dis="${BUILD_DIR}/dis/${base}${opt_flag}.dis"
+    data="${BUILD_DIR}/dis/${base}${opt_flag}.data"
+    log="${BUILD_DIR}/logs/${base}${opt_flag}.txt"
 
     echo "[*] Compiling C file: $input_file with ${opt_flag:-no optimization} ..."
     
@@ -95,7 +105,22 @@ compile_c() {
         $GCC_PREFIX-gcc $ABI -c "$input_file" -o "$obj"
     fi
 
-    echo "[+] Output: $asm, $obj"
+    start_obj="${BUILD_DIR}/obj/start.o"
+    $GCC_PREFIX-as $ABI -o "$start_obj" start.s
+
+    echo "[*] Linking with start.o ..."
+    $GCC_PREFIX-gcc $ABI -lgcc -T"$LINK" -o "$exe" "$start_obj" "$obj" -nostartfiles -lm
+
+    echo "[*] Generating hex and disassembly ..."
+    $GCC_PREFIX-objcopy -O verilog "$exe" "$hex"
+    $GCC_PREFIX-objdump -S "$exe" > "$dis"
+    $GCC_PREFIX-objdump -s -j .data "$exe" > "$data"
+
+    echo "[*] Executing with whisper ..."
+    whisper -x "$hex" -s 0x80000000 --tohost 0xd0580000 -f "$log" --configfile "$WHISPER_CFG"
+
+    echo "[+] Output: $asm, $obj, $exe, $hex, $dis, $data"
+    echo "[+] Execution log saved to $log"
 }
 
 execute() {
