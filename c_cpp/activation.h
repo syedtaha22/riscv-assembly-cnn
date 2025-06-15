@@ -2,13 +2,24 @@
 #define ACTIVATION_H
 
 #include <stdint.h>     // for uint32_t
-#include <math.h>      // for expf
+
+float exp_taylor(float x, int terms) {
+    float result = 1.0f;
+    float term = 1.0f;
+
+    for (int i = 1; i < terms; ++i) {
+        term *= x / i;
+        result += term;
+    }
+
+    return result;
+}
 
 void softmax(float* input, uint32_t size) {
     // Compute exponentials and simultaneously accumulate sum
     float sum = 0.0f;
     for (uint32_t i = 0; i < size; ++i) {
-        input[i] = expf(input[i]);
+        input[i] = exp_taylor(input[i], 1000);
         sum += input[i];
     }
 
