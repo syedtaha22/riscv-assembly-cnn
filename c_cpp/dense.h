@@ -6,7 +6,6 @@
 
 
 void dense(float* input) {
-
     for (uint32_t i = 0; i < D_OUT_DIM; ++i) {
         float sum = dense_biases[i];
         for (uint32_t j = 0; j < D_IN_DIM; ++j)
