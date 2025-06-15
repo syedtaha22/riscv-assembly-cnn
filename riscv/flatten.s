@@ -19,31 +19,27 @@ flatten:
     lw t0, 0(t0)                   # t0 = FL_IN_DIM (e.g. 12)
     lw t1, 0(t1)                   # t1 = FL_IN_CHANNELS (e.g. 8)
     mul t2, t0, t0                 # t2 = FL_IN_DIM * FL_IN_DIM = 144
+    slli s2, t2, 2                 # stride in bytes between channels = 144 * 4
+
+    vsetvli s3, t1, e32            # VL = channels, e32
+
     li t3, 0                       # flat_index = 0
 
     li t4, 0                       # i = 0
     loop_i:
         bge t4, t0, loop_i_end
 
+        # Precompute value
+        mul t2, t4, t0                 # t2 = i * FL_IN_DIM
+
         li t5, 0                       # j = 0
         loop_j:
             bge t5, t0, loop_j_end
 
             # input_patch_index = i * FL_IN_DIM + j
-            mul t6, t4, t0                 # t6 = i * FL_IN_DIM
-            add t6, t6, t5                 # t6 = i * W + j
-
-            ######## TODO: Take this out of the loop ########
-            slli s2, t2, 2                 # stride in bytes between channels = 144 * 4
-            #####################################################
-
-            vsetvli s3, t1, e32            # VL = channels, e32
-
-            ######## TODO: Use t6 instead of s4 ########
-            slli s4, t6, 2                 # offset in bytes
-            add s5, a0, s4                 # input + offset
-            #####################################################
-
+            add t6, t2, t5                 # t6 = i * W + j
+            slli t6, t6, 2                 # offset in bytes
+            add s5, a0, t6                 # input + offset
 
             vlse32.v v5, (s5), s2          # load strided values into v5
 
