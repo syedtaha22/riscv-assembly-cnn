@@ -4,7 +4,7 @@
 #include <stdint.h>     // for uint32_t
 #include "config.h"    // for CL_IN_DIM, CL_OUT_DIM, etc.
 
-float* flatten(float* input) {
+void flatten(float* input) {
     uint32_t index = 0;
     uint32_t spatial_size = FL_IN_DIM * FL_IN_DIM;
 
