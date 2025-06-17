@@ -57,10 +57,10 @@ int main() {
     softmax(dense_out, D_OUT_DIM);
 
     get_max_index_in_range(dense_out, dense_out + D_OUT_DIM);
-    printf("Predicted label: %d\n", prediction);
 
     // Print dense output for debugging
     for (int i = 0; i < D_OUT_DIM; ++i) printf("dense_out[%d] = %f\n", i, dense_out[i]);
+    printf("Predicted label: %d\n", prediction);
 
     return 0;
 }
