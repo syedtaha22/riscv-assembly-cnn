@@ -27,3 +27,5 @@ __pycache__/
 *.exe
 
 docs/outline.txt
+
+script_to_count_instruction.txt
