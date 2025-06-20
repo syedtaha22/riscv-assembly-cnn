@@ -63,16 +63,15 @@ conv2d:
                     slli t5, t5, 2            # byte offset = *4
                     add  t5, a0, t5           # &image[row_offset]
 
-                    # Load input row with stride = 29
-                    vle32.v v1, 0(t5)      # input patch row
-
                     # filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM
                     # filter_row = (s1 + fi) * CL_FILTER_DIM                 (take CL_FILTER_DIM common)
-                    add t6, s1, t4         # + fi
-                    mul t6, t6, a6         # * FD
-
+                    add t6, s1, t4            # + fi
+                    mul t6, t6, a6            # * FD
                     slli t6, t6, 2            # byte offset = *4
                     add  t6, a1, t6           # &filter_row
+
+                    # Load input row with stride = 29
+                    vle32.v v1, 0(t5)         # input patch row
 
                     # Load filter row (contiguous memory)
                     vle32.v v2, 0(t6)         # filter row
