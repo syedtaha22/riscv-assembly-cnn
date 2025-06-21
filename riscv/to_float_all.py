@@ -1,31 +1,61 @@
 import struct
 import numpy as np
 
-def hex_to_float(hex_val):
-    return struct.unpack('!f', bytes.fromhex(hex_val))[0]
+def hex_to_float(hex_val, use_float16=False):
+    # Ensure even-length hex string
+    if len(hex_val) % 2 != 0:
+        hex_val = "0" + hex_val  # pad left if needed
 
-def extract_floats_from_log(filename, instruction="vlse32", first_only=False):
+    byte_data = bytes.fromhex(hex_val)
+    
+    if use_float16:
+        if len(byte_data) != 2:
+            raise ValueError(f"Invalid half-precision hex: {hex_val}")
+        # Swap for little-endian if needed
+        byte_data = byte_data[::-1]
+        return struct.unpack('<e', byte_data)[0]
+    else:
+        if len(byte_data) != 4:
+            raise ValueError(f"Invalid single-precision hex: {hex_val}")
+        byte_data = byte_data[::-1]
+        return struct.unpack('<f', byte_data)[0]
+
+def extract_floats_from_log(filename, instruction="vlse16", first_only=False, use_float16=False):
     floats = []
+    chunk_size = 4 if use_float16 else 8  # hex digits: 4 for f16, 8 for f32
+
     with open(filename, 'r') as file:
         for line in file:
             if instruction in line:
                 parts = line.strip().split()
                 if len(parts) < 7:
-                    continue  # Not a valid line
+                    continue
                 hex_string = parts[6]
 
-                # Split into 32-bit float chunks
-                chunks = [hex_string[i:i+8] for i in range(0, len(hex_string), 8)]
-                chunks.reverse()  # Correct memory order
+                # Handle scalar register (e.g., f3 = 8 hex digits)
+                if len(hex_string) == 8:
+                    try:
+                        if use_float16:
+                            # Use only least significant 16 bits (last 4 hex digits)
+                            floats.append(hex_to_float(hex_string[4:], use_float16=True))
+                        else:
+                            floats.append(hex_to_float(hex_string, use_float16=False))
+                    except Exception as e:
+                        print(f"Skipping invalid scalar hex: {e}")
+                    continue
+
+                # Otherwise treat as packed vector register
+                chunks = [hex_string[i:i + chunk_size] for i in range(0, len(hex_string), chunk_size)]
+                chunks.reverse()  # memory order correction
 
                 try:
                     if first_only:
-                        floats.append(hex_to_float(chunks[0]))
+                        floats.append(hex_to_float(chunks[0], use_float16))
                     else:
                         for chunk in chunks:
-                            floats.append(hex_to_float(chunk))
+                            floats.append(hex_to_float(chunk, use_float16))
                 except Exception as e:
-                    print(f"Skipping invalid hex: {e}")
+                    print(f"Skipping invalid hex chunk: {e}")
     return floats
 
 def display_floats(values, shape=None, channel_view=False):
@@ -52,21 +82,24 @@ def display_floats(values, shape=None, channel_view=False):
 
 if __name__ == "__main__":
     filename = "build/logs/main.txt"
-    instruction = "vle32.v v10, (a0)"  # Change to "vlse32" or "vfredmax" as needed
-    
-    values = extract_floats_from_log(filename, instruction=instruction, first_only=(instruction == "vfredosum"))
+    instruction = "vle16.v v10, (a0)"
 
-    # # get the last 4608 values
-    # print(len(values), "values before slicing")
-    # values = values[-16:-6]
-    # print(len(values), "values extracted")
-    values = values[:10]
+    values = extract_floats_from_log(
+        filename,
+        instruction=instruction,
+        first_only=False,
+        use_float16=True  # Change this to True if you're parsing float16
+    )
+
+    # values = values[1::2]  # Skip every second value
+    values = values[:10]  
 
     display_floats(
         values,
-        # shape=(8,12,12),              # e.g., (8, 24, 24) if reshaping
+        # shape=None,  # Set to None for flat output
         shape=None,
-        channel_view=False       # Set True if using (C, H, W)
+        channel_view=True
     )
 
+    # Print model prediction
     print("\nModel prediction:", np.argmax(values))
