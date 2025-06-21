@@ -19,9 +19,9 @@ flatten:
     lw t0, 0(t0)                   # t0 = FL_IN_DIM (e.g. 12)
     lw t1, 0(t1)                   # t1 = FL_IN_CHANNELS (e.g. 8)
     mul t2, t0, t0                 # t2 = FL_IN_DIM * FL_IN_DIM = 144
-    slli s2, t2, 2                 # stride in bytes between channels = 144 * 4
+    slli s2, t2, 1                 # stride in bytes between channels = 144 * 2
 
-    vsetvli s3, t1, e32            # VL = channels, e32
+    vsetvli s3, t1, e16            # VL = channels, e16
 
     li t3, 0                       # flat_index = 0
 
@@ -38,14 +38,14 @@ flatten:
 
             # input_patch_index = i * FL_IN_DIM + j
             add t6, t2, t5                 # t6 = i * W + j
-            slli t6, t6, 2                 # offset in bytes
+            slli t6, t6, 1                 # offset in bytes
             add s5, a0, t6                 # input + offset
 
-            vlse32.v v5, (s5), s2          # load strided values into v5
+            vlse16.v v5, (s5), s2          # load strided values into v5
 
-            slli s6, t3, 2                 # output offset = flat_index * 4
+            slli s6, t3, 1                 # output offset = flat_index * 2
             add s7, a1, s6                 # output address
-            vse32.v v5, (s7)               # store result
+            vse16.v v5, (s7)               # store result
 
             add t3, t3, t1                 # flat_index += channels
             addi t5, t5, 1
@@ -68,5 +68,5 @@ flatten:
 FL_IN_DIM:              .word 12
 FL_IN_CHANNELS:         .word 8
 
-# Output of flatten layer (12x12x8 = 1152 elements) * 4 bytes = 4608 bytes
-flatten_output:         .space 4608                # Reserve space for flattened output
+# Output of flatten layer (12x12x8 = 1152 elements) * 2 bytes = 2304 bytes
+flatten_output:         .space 2304                # Reserve space for flattened output
