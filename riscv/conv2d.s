@@ -10,28 +10,35 @@ conv2d:
     # Load addresses for global variables
     la a1, conv_filters         # Load address of filters
     la a2, conv_biases          # Load address of biases
-    la a3, CL_IN_DIM            # Load address of input dimensions
-    la a4, CL_OUT_DIM           # Load address of output dimensions
-    la a5, CL_NUM_FILTERS       # Load address of number of filters
-    la a6, CL_FILTER_DIM        # Load address of filter dimensions
-    la a7, CL_STRIDE            # Load address of stride
-    la s3, result               # Load address for result
+
+    la t0, CL_IN_DIM            # Load input dimension address
+    lw a3, 0(t0)                # Load input dimension
+    lw a4, 4(t0)                # Load output dimension
+    lw a5, 12(t0)               # Load number of filters
+    lw a6, 16(t0)               # Load filter dimension
+    lw a7, 20(t0)               # Load stride
 
     # Save registers that will be used
     addi sp, sp, -16            # Make space on the stack for saved registers
     sw ra, 0(sp)                # Save return address
     sw s3, 4(sp)                # Save result pointer (s3)
 
-    lw a3, 0(a3)                # Load input dimension
-    lw a4, 0(a4)                # Load output dimension
-    lw a5, 0(a5)                # Load number of filters
-    lw a6, 0(a6)                # Load filter dimension
-    lw a7, 0(a7)                # Load stride
+    # Set vector lenght, only once
+    vsetvli t0, a6, e32, m1  # vector length = FILTER_DIM
 
     # Loop over the CL_NUM_FILTERS
     li t1, 0                     # k = 0
     loop_k:
         bge t1, a5, loop_k_end   # if k >= CL_NUM_FILTERS, exit
+
+        # Precompute offsets values
+        mul s1, t1, a6         # s1 = k * CL_FILTER_DIM (used for filter row offset)
+
+        # Precompute bias address for the current filter
+        # Calculate bias index: bias address + k
+        slli t0, t1, 2            # byte offset = *4
+        add t0, a2, t0           # &bias[k]
+        flw ft6, 0(t0)             # Load bias value
 
         # Loop over the output dimensions
         li t2, 0                 # i = 0
@@ -42,7 +49,6 @@ conv2d:
             loop_j:
                 bge t3, a4, loop_j_end   # if j >= CL_OUT_DIM, exit
 
-                vsetvli t0, a6, e32, m1  # vector length = FILTER_DIM
                 vmv.v.x v5, x0       # Set all elements of v5 to zero
 
                 li t4, 0                 # fi = 0
@@ -53,23 +59,19 @@ conv2d:
                     add  t5, t2, t4           # input_row = i + fi
                     mul  t5, t5, a3           # input_row *= CL_IN_DIM
                     add  t5, t5, t3           # input_row += input_row + j
+                    
                     slli t5, t5, 2            # byte offset = *4
                     add  t5, a0, t5           # &image[row_offset]
 
-                    # Load input row with stride = 29
-                    li s1, 4 # Come back to this. TODO
-                    vsetvli t0, a6, e32, m1     # vector length = FILTER_DIM
-                    vle32.v v1, 0(t5)      # input patch row
-
                     # filter_row = k * (CL_FILTER_DIM * CL_FILTER_DIM) + fi * CL_FILTER_DIM
-                    # filter_row = (k * CL_FILTER_DIM + fi) * CL_FILTER_DIM                 (take CL_FILTER_DIM common)
-                    mul t6, t1, a6         # k * FD
-                    add t6, t6, t4         # + fi
-                    mul t6, t6, a6         # * FD
-
+                    # filter_row = (s1 + fi) * CL_FILTER_DIM                 (take CL_FILTER_DIM common)
+                    add t6, s1, t4            # + fi
+                    mul t6, t6, a6            # * FD
                     slli t6, t6, 2            # byte offset = *4
                     add  t6, a1, t6           # &filter_row
 
+                    # Load input row with stride = 29
+                    vle32.v v1, 0(t5)         # input patch row
 
                     # Load filter row (contiguous memory)
                     vle32.v v2, 0(t6)         # filter row
@@ -81,20 +83,13 @@ conv2d:
                     j conv_row
                 conv_end:
                     # Sum reduction
-                    vsetvli t0, a6, e32, m1
+                    vfmv.s.f v3, ft6           # Initialize v3 with bias
                     
-                    # Calculate bias index: bias address + k
-                    slli t6, t1, 2            # byte offset = *4
-                    add t6, a2, t6           # &bias[k]
-                    lw t6, 0(t6)             # Load bias value
-
-                    # TODO: Why is this a integer? Make it float
-                    vmv.s.x v3, t6           # Initialize v3 with bias
                     vfredsum.vs v3, v5, v3
 
                     # Store result
-                    vmv.x.s t0, v3         # Extract scalar from v3[0]
-                    sw t0, 0(s3)           # Store single float
+                    vfmv.f.s ft0, v3         # Extract scalar from v3[0]
+                    fsw ft0, 0(s3)           # Store single float
                     addi s3, s3, 4          # Increment result pointer
 
                     addi t3, t3, 1           # j++

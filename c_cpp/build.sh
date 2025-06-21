@@ -2,7 +2,7 @@
 
 # ================= Configuration =================
 GCC_PREFIX="riscv32-unknown-elf"
-ABI="-march=rv32imfcv -mabi=ilp32f"
+ABI="-march=rv32imfcv -mabi=ilp32"  # Changed to ilp32 so that O3 optimizations are supported by whisper
 LINK="veer/link.ld"
 WHISPER_CFG="veer/whisper.json"
 BUILD_DIR="build"
@@ -24,7 +24,6 @@ show_help() {
     echo "Examples:"
     echo "  $0 -a main.s -l conv2d.s"
     echo "  $0 -g -O3 main.c"
-    echo "  $0 -a main.s -l conv2d.s -l relu.s -l maxpool.s -l flatten.s -l dense.s -l softmax.s"
 }
 
 make_dirs() {
