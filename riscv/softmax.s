@@ -19,9 +19,10 @@ softmax:
     flw f5, 4(t4)        # Load 1/ln(2) from memory
 
     # Initialize accumulator for sum(exp(x))
-    addi t0, zero, 1
-    vsetvli t0, t0, e32, ta, ma     # Set vector config, VL into t0
+    vsetvli t0, zero, e32, ta, ma     # Set vector config, VL into t0
     vmv.v.i v4, 0                   # v4 = 0.0
+
+    vmv.v.i v12, -1                 # v12 = -1 (used for negating)
 
     reduce_range:
         vsetvli t6, a2, e32, ta, ma     # Set vector config, VL into t6
@@ -45,7 +46,7 @@ softmax:
         # Broad cast 2 in to v7
         vmv.v.i v7, 2                     # Initialize v7 with 2 for base of exponentiation
         vmslt.vi v0, v6, 0                # v0 = mask where v6 < 0 (n is negative)
-        vneg.v v9, v6                     # v9 = -v6 (absolute value of n for negative cases)
+        vmul.vv v9, v6, v12               # v9 = -v6 (absolute value of n for negative cases)
         vsll.vv v7, v7, v6                # v7 = 2^n (works correctly only for non-negative n)
         vmv.v.i v11, 2                    # Initialize v11 with 2
         vsll.vv v11, v11, v9              # v11 = 2^|n| for negative n
