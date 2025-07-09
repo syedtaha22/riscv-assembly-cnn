@@ -76,6 +76,7 @@ maxpool:
                     add s8, s8, s6                 # + output channel offset
                     slli s8, s8, 2                 # Convert to byte offset
                     add s8, a1, s8                 # final output address
+                    vsetivli s3, 1, e32, m1  # Set vector length to 1 for storing
 
                     vse32.v v6, (s8)               # Store max-pooled value
 
