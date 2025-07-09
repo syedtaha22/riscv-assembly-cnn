@@ -1,5 +1,6 @@
 .section .text
 .global softmax
+
 # Function: softmax
 # Arguments:
 #   a0 - address of the input array 
@@ -15,8 +16,8 @@ softmax:
     lw a2, 0(a1)                # Load number of elements from memory
 
     la t4, LN2          # Load ln(2) address
-    flw f4, 0(t4)        # Load ln(2) from memory
-    flw f5, 4(t4)        # Load 1/ln(2) from memory
+    lh s4, 0(t4)        # Load ln(2) from memory
+    lh s5, 2(t4)        # Load 1/ln(2) from memory
 
     # Initialize accumulator for sum(exp(x))
     vsetvli t0, zero, e32, ta, ma     # Set vector config, VL into t0
@@ -24,23 +25,25 @@ softmax:
 
     vmv.v.i v12, -1                 # v12 = -1 (used for negating)
 
+    vmv.v.i v12, -1                 # v12 = -1 (used for negating)
+
     reduce_range:
-        vsetvli t6, a2, e32, ta, ma     # Set vector config, VL into t6
+        vsetvli t6, a2, e16, ta, ma     # Set vector config, VL into t6
         sub a2, a2, t6                  # Decrement number of elements
-        slli t6, t6, 2                  # Multiply number of elements by 4 bytes
+        slli t6, t6, 1                  # Multiply number of elements by 2 bytes
 
 
         # Do this first so that we can use v1 for 1/2^n later
         # --- Taylor series: result = 1.0, term = 1.0 ---
-        addi t3, zero, 1                # t3 = 1
-        fcvt.s.w f0, t3                 # f0 = float(1)
-        vfmv.v.f v1, f0                 # v1 = broadcast 1.0
-        vfmv.v.f v2, f0                 # v2 = term vector
+        li t3, 0x3c00                # t3 = 1
+        vmv.v.x v1, t3                  # v1 = broadcast(1.0) (as float)
+        vmv.v.x v2, t3                  # v2 = term vector (initially 1.0)
 
-        vle32.v v8, (a0)                # Load input[] into v8 (x)
+        vle16.v v8, (a0)                # Load input[] into v8 (x)
 
         # Calculate n = (int)(x / ln(2)) ---> v6
-        vfmul.vf v6, v8, f5              # v6 = x * (1/ln(2))
+        vmv.v.x v16, s4                # v16 = ln(2) as a vector
+        vfdiv.vv v6, v8, v16              # v6 = x * (1/ln(2))
         vfcvt.x.f.v v6, v6              # Convert to integer
 
         # Broad cast 2 in to v7
@@ -48,16 +51,17 @@ softmax:
         vmslt.vi v0, v6, 0                # v0 = mask where v6 < 0 (n is negative)
         vmul.vv v9, v6, v12               # v9 = -v6 (absolute value of n for negative cases)
         vsll.vv v7, v7, v6                # v7 = 2^n (works correctly only for non-negative n)
+        vfcvt.f.x.v v7, v7                  # Convert 2^n to float
+        
         vmv.v.i v11, 2                    # Initialize v11 with 2
         vsll.vv v11, v11, v9              # v11 = 2^|n| for negative n
         vfcvt.f.x.v v11, v11              # Convert 2^|n| to float
         vfdiv.vv v11, v1, v11             # v11 = 1 / (2^|n|) for negative n
-        vmerge.vvm v7, v11, v7, v0        # For negative n (mask true), use 1/2^|n|; else keep 2^n
-
+        vmerge.vvm v7, v7, v11, v0        # For negative n (mask true), use 1/2^|n|; else keep 2^n
 
         # Calculate r = x - n * ln(2) ---> v5
         vfcvt.f.x.v v6, v6              # Convert n back to float
-        vfmul.vf v5, v6, f4              # v5 = n * ln(2)
+        vfmul.vv v5, v6, v16              # v5 = n * ln(2)
         vfsub.vv v5, v8, v5              # v5 = x - n * ln(2)
 
         vmv.v.i v3, 1                   # v3 = 1.0 (for i=1)
@@ -83,7 +87,7 @@ softmax:
         vfmul.vv v1, v1, v7            # v1 = exp(r) * 2^n
         # v1 now contains exp(x) for the reduced range
         # Store exp(x) back to input[]
-        vse32.v v1, (a0)            # Store exp(x) back to input[]
+        vse16.v v1, (a0)            # Store exp(x) back to input[]
         add a0, a0, t6              # Increment pointer for input
         vfredosum.vs v4, v1, v4     # v4[0] = sum(exp(x))
         
@@ -97,17 +101,17 @@ softmax:
 
     # Normalize the exponentials
     normalize:
-        vsetvli t0, a2, e32, ta, ma     # Set vector config, VL into t0
+        vsetvli t0, a2, e16, ta, ma     # Set vector config, VL into t0
         sub a2, a2, t0                  # Decrement number of elements
-        slli t0, t0, 2                  # Multiply number of elements by 4 bytes
+        slli t0, t0, 1                  # Multiply number of elements by 2 bytes
         
         vfmv.v.f v1, f0                 # v1 = broadcast(sum)
 
-        vle32.v v8, (a0)                # Load input[] into v8 (x)
+        vle16.v v8, (a0)                # Load input[] into v8 (x)
         vfdiv.vv v8, v8, v1             # v8 = exp(x) / sum(exp(x))
 
         # Store back result
-        vse32.v v8, (a0)
+        vse16.v v8, (a0)
         add a0, a0, t0                  # Increment pointer for input
 
         bnez a2, normalize              # if (a2 != 0 i.e more elements) continue
@@ -122,5 +126,5 @@ softmax:
 
 array_size:    .word 10
 
-LN2:      .word 0x3f317218    # ln(2) ≈ 0.69314718
-LN2_INV:  .word 0x3fb8aa3b    # 1/ln(2) ≈ 1.44269504
+LN2:      .half 0x398c    # ln(2) ≈ 0.69314718
+LN2_INV:  .half 0x3dc5    # 1/ln(2) ≈ 1.44269504

@@ -34,7 +34,6 @@ maxpool:
         loop_i:
             bge s5, t3, loop_i_end
 
-
             # Precompute input_channel_offset + i * MP_STRIDE * MP_IN_DIM
             mul s10, s5, t2                 # s10 = i * MP_STRIDE
             mul s10, s10, t0                # s10 *= MP_IN_DIM
@@ -60,11 +59,11 @@ maxpool:
                     mul t5, t6, t0                # t5 = ki * MP_IN_DIM
                     add t5, s7, t5                
 
-                    slli t5, t5, 2                # Convert to byte offset
+                    slli t5, t5, 1                # Convert to byte offset
                     add t5, a0, t5                # t5 = base address of input patch row
 
-                    vsetvli s3, t1, e32, m1       # VL = kernel_dim
-                    vle32.v v5, (t5)              # Load current row of patch
+                    vsetvli s3, t1, e16, m1       # VL = kernel_dim
+                    vle16.v v5, (t5)              # Load current row of patch
                     vfredmax.vs v6, v5, v6        # Reduce into v6
 
                     addi t6, t6, 1
@@ -74,10 +73,10 @@ maxpool:
                     mul s8, s5, t3                 # i * MP_OUT_DIM
                     add s8, s8, s9                 # + j
                     add s8, s8, s6                 # + output channel offset
-                    slli s8, s8, 2                 # Convert to byte offset
+                    slli s8, s8, 1                 # Convert to byte offset
                     add s8, a1, s8                 # final output address
-
-                    vse32.v v6, (s8)               # Store max-pooled value
+                    
+                    vse16.v v6, (s8)               # Store max-pooled value
 
                     addi s9, s9, 1                 # j++
                     j loop_j

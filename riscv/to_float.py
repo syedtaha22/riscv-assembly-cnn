@@ -1,30 +1,65 @@
 import struct
 
 # Input hex string
-hex_string = "000000002afff720280889a02e7941a72e8076262d22fd352fc9b4533188a5e8"
+hex_string = "0000000000000000000000004800ec00a800340030008600b200b20090000400"
 
-# Ensure hex string has a length that's a multiple of 8 characters (4 bytes)
-if len(hex_string) % 8 != 0:
-    hex_string = hex_string.rstrip()
+# Toggle one of these to True
+use_fp16 = True
+use_fp32 = False
+use_int16 = False  # New flag for 16-bit signed integers
 
-# Split the hex string into chunks of 8 characters (4 bytes each)
-chunks = [hex_string[i:i+8] for i in range(0, len(hex_string), 8)]
+# Determine chunk size
+chunk_size = 4 if use_fp32 else 2
+hex_chunk_len = chunk_size * 2
 
-# Function to convert hex to float
-def hex_to_float(hex_value):
-    # Convert hex to bytes
+# Truncate hex string to a multiple of chunk size
+if len(hex_string) % hex_chunk_len != 0:
+    hex_string = hex_string[:len(hex_string) - (len(hex_string) % hex_chunk_len)]
+
+# Split hex string into chunks
+chunks = [hex_string[i:i+hex_chunk_len] for i in range(0, len(hex_string), hex_chunk_len)]
+
+# Conversion functions
+def hex_to_float16(hex_value):
     bytes_value = bytes.fromhex(hex_value)
-    # Convert bytes to float (assuming IEEE 754 standard)
+    half = int.from_bytes(bytes_value, byteorder='big')
+    sign = ((half >> 15) & 0x00000001)
+    exponent = ((half >> 10) & 0x0000001f)
+    fraction = (half & 0x03ff)
+
+    if exponent == 0:
+        if fraction == 0:
+            return float((-1)**sign * 0.0)
+        else:
+            return (-1)**sign * 2**(-14) * (fraction / 1024)
+    elif exponent == 0x1F:
+        if fraction == 0:
+            return float('inf') if sign == 0 else float('-inf')
+        else:
+            return float('nan')
+    else:
+        return (-1)**sign * 2**(exponent - 15) * (1 + fraction / 1024)
+
+def hex_to_float32(hex_value):
+    bytes_value = bytes.fromhex(hex_value)
     return struct.unpack('!f', bytes_value)[0]
 
-# Convert each chunk to its corresponding float value
-float_values = [hex_to_float(chunk) for chunk in chunks]
+def hex_to_int16(hex_value):
+    bytes_value = bytes.fromhex(hex_value)
+    return struct.unpack('!h', bytes_value)[0]
 
-# three decimal places
-float_values = [round(value, 3) for value in float_values]
+# Convert
+if use_fp32:
+    float_values = [round(hex_to_float32(chunk), 10) for chunk in chunks]
+elif use_fp16:
+    float_values = [round(hex_to_float16(chunk), 10) for chunk in chunks]
+elif use_int16:
+    float_values = [hex_to_int16(chunk) for chunk in chunks]
+else:
+    raise ValueError("Enable one of use_fp16, use_fp32, or use_int16")
 
-# reverse the list to get the original order
+# Reverse for original order
 float_values.reverse()
 
-# Print the resulting float values
+# Print result
 print(float_values)
