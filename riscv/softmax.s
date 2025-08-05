@@ -25,8 +25,6 @@ softmax:
 
     vmv.v.i v12, -1                 # v12 = -1 (used for negating)
 
-    vmv.v.i v12, -1                 # v12 = -1 (used for negating)
-
     reduce_range:
         vsetvli t6, a2, e16, ta, ma     # Set vector config, VL into t6
         sub a2, a2, t6                  # Decrement number of elements
