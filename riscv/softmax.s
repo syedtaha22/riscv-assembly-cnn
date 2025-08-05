@@ -45,17 +45,22 @@ softmax:
         vfcvt.x.f.v v6, v6              # Convert to integer
 
         # Broad cast 2 in to v7
-        vmv.v.i v7, 2                     # Initialize v7 with 2 for base of exponentiation
-        vmslt.vi v0, v6, 0                # v0 = mask where v6 < 0 (n is negative)
-        vmul.vv v9, v6, v12               # v9 = -v6 (absolute value of n for negative cases)
-        vsll.vv v7, v7, v6                # v7 = 2^n (works correctly only for non-negative n)
-        vfcvt.f.x.v v7, v7                  # Convert 2^n to float
+        vmv.v.i v7, 2                # Initialize v7 with 2 for base of exponentiation
+
+        # Calculate 2^n in v10 for n >= 0
+        vsll.vv v10, v7, v6          # v7 = 2^n (works correctly only for non-negative n)
+        vfcvt.f.x.v v10, v10         # Convert 2^n to float
         
-        vmv.v.i v11, 2                    # Initialize v11 with 2
-        vsll.vv v11, v11, v9              # v11 = 2^|n| for negative n
-        vfcvt.f.x.v v11, v11              # Convert 2^|n| to float
-        vfdiv.vv v11, v1, v11             # v11 = 1 / (2^|n|) for negative n
-        vmerge.vvm v7, v7, v11, v0        # For negative n (mask true), use 1/2^|n|; else keep 2^n
+
+        # Calculate 1/2^n in v7 for n < 0
+        vmslt.vi v0, v6, 0           # v0 = mask where v6 < 0 (n is negative)
+        vmul.vv v9, v6, v12          # v9 = -v6 (absolute value of n for negative cases)
+        vsll.vv v7, v7, v9           # v7 = 2^|n|
+        vfcvt.f.x.v v7, v7           # Convert 2^|n| to float
+        vfdiv.vv v7, v1, v7          # v7 = 1 / (2^|n|) for negative n
+
+        # Use vmerge to select between 2^n and 1/2^|n|
+        vmerge.vvm v10, v10, v7, v0  # For negative n (mask true), use 1/2^|n|; else keep 2^n
 
         # Calculate r = x - n * ln(2) ---> v5
         vfcvt.f.x.v v6, v6              # Convert n back to float
@@ -82,7 +87,7 @@ softmax:
         exp_done:
 
         # Now we have exp(r) in v1, we need to multiply it by 2^n
-        vfmul.vv v1, v1, v7            # v1 = exp(r) * 2^n
+        vfmul.vv v1, v1, v10            # v1 = exp(r) * 2^n
         # v1 now contains exp(x) for the reduced range
         # Store exp(x) back to input[]
         vse16.v v1, (a0)            # Store exp(x) back to input[]
