@@ -18,7 +18,7 @@ relu:
     lw a1, 0(a1)              # Load number of elements from memory
 
     vsetvli t0, zero, e16, m1, ta, ma 
-    vmv.v.i v2, 0             # v5 = 0.0 (ReLU threshold)
+    vmv.v.i v2, 0             # v2 = 0.0 (ReLU threshold)
 
     relu_loop:
         vsetvli t0, a1, e16, m1, ta, ma     # Set vector length
