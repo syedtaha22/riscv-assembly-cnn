@@ -59,6 +59,9 @@ def extract_floats_from_log(filename, instruction="vlse16", first_only=False, us
     return floats
 
 def display_floats(values, shape=None, channel_view=False):
+    if len(values) == 0:
+        print("No values to display.")
+        return
     if shape is not None:
         try:
             array = np.array(values, dtype=np.float32).reshape(shape)
