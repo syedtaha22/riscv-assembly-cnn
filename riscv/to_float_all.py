@@ -99,10 +99,13 @@ if __name__ == "__main__":
 
     display_floats(
         values,
-        # shape=None,  # Set to None for flat output
-        shape=None,
+        shape=None,  # Set to None for flat output
+        # shape=(1, 24 * 24, 25),
         channel_view=True
     )
 
     # Print model prediction
-    print("\nModel prediction:", np.argmax(values))
+    if len(values) == 0:
+        print("No values for prediction.")
+    else:
+        print("\nModel prediction:", np.argmax(values))
