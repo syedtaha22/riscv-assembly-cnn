@@ -23,7 +23,7 @@ show_help() {
     echo
     echo "Examples:"
     echo "  $0 -a main.s -l conv2d.s"
-    echo "  $0 -g -O3 main.c"
+    echo "  $0 -g -O3 main-riscv.c"
 }
 
 make_dirs() {
