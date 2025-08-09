@@ -29,3 +29,6 @@ __pycache__/
 docs/outline.txt
 
 script_to_count_instruction.txt
+
+*.png
+*.tex
