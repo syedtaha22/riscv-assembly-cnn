@@ -18,13 +18,13 @@ void forward(float* input) {
 }
 
 int main() {
-    float input[CL_IN_DIM * CL_IN_DIM * CL_IN_CHANNELS];
     int correct_predictions = 0;
     // load_model_params();
     double total_time = 0.0;
-    int samples = 100; // Number of samples to process
+    int samples = 1000; // Number of samples to process
 
     for (int i = 0; i < samples; i++) {
+        float input[CL_IN_DIM * CL_IN_DIM * CL_IN_CHANNELS];
         int label = read_mnist_sample(fopen("../models/mnist_samples.csv", "r"), input, i);
         if (label < 0) {
             fprintf(stderr, "Error reading sample %d\n", i);
@@ -39,19 +39,11 @@ int main() {
 
         get_max_index_in_range(dense_out, dense_out + D_OUT_DIM);
 
-        if (prediction == label) {
-            printf("Correct   prediction for image %d: predicted %d, actual %d\n", i + 1, prediction, label);
-            correct_predictions++;
-        }
-        else {
-            printf("Incorrect prediction for image %d: predicted %d, actual %d\n", i + 1, prediction, label);
-        }
+        if (prediction == label) correct_predictions++;
     }
 
-    // Print accuracy
     printf("Accuracy: %.2f%%\n", (float)correct_predictions / samples * 100);
-    // Print average time per sample
-    printf("Average time per sample: %.6f seconds\n", total_time / samples);
+    printf("Average time per sample: %.6f ms\n", (total_time / samples) * 1000);
 
     return 0;
 }
